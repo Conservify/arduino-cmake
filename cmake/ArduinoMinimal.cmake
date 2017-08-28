@@ -1,8 +1,12 @@
 set(ARDUINO_IDE "$ENV{HOME}/conservify/arduino-1.8.3")
-set(ARDUINO_ROOT "${ARDUINO_IDE}/packages/arduino")
+set(ARDUINO_IDE_LIBRARIES_PATH "${ARDUINO_IDE}/libraries")
+set(ARDUINO_CORE_ROOT_PATH "${ARDUINO_IDE}/packages/arduino")
+set(ARDUINO_CORE_PATH "${ARDUINO_CORE_ROOT_PATH}/hardware/samd/1.6.6")
+set(ARDUINO_CORE_LIBRARIES_PATH "${ARDUINO_CORE_PATH}/libraries")
 
-link_directories(${ARDUINO_IDE}/libraries)
-link_directories(${ARDUINO_ROOT}/hardware/samd/1.6.6/libraries)
+set(ARDUINO_BOARD_CORE_ROOT_PATH "${ARDUINO_IDE}/packages/adafruit")
+set(ARDUINO_BOARD_CORE_PATH "${ARDUINO_BOARD_CORE_ROOT_PATH}/hardware/samd/1.0.12")
+set(ARDUINO_BOARD_CORE_LIBRARIES_PATH "${ARDUINO_BOARD_CORE_PATH}/libraries")
 
 set(ARDUINO_BOARD "arduino_zero")
 set(ARDUINO_MCU "cortex-m0plus")
@@ -11,13 +15,18 @@ set(BOARD_ID ${ARDUINO_BOARD})
 set(EXECUTABLE_OUTPUT_PATH  "${CMAKE_CURRENT_SOURCE_DIR}/build")
 set(LIBRARY_OUTPUT_PATH  "${CMAKE_CURRENT_SOURCE_DIR}/build")
 
-set(ARM_TOOLS "${ARDUINO_ROOT}/tools/arm-none-eabi-gcc/4.8.3-2014q1/bin")
+set(ARDUINO_CORE_DIR "${ARDUINO_BOARD_CORE_PATH}/cores/arduino/")
+set(ARDUINO_BOARD_DIR "${ARDUINO_BOARD_CORE_PATH}/variants/${ARDUINO_BOARD}")
+set(ARDUINO_CMSIS_DIR "${ARDUINO_CORE_ROOT_PATH}/tools/CMSIS/4.0.0-atmel/CMSIS/Include/")
+set(ARDUINO_DEVICE_DIR "${ARDUINO_CORE_ROOT_PATH}/tools/CMSIS/4.0.0-atmel/Device/ATMEL/")
+
+set(ARM_TOOLS "${ARDUINO_CORE_ROOT_PATH}/tools/arm-none-eabi-gcc/4.8.3-2014q1/bin")
 set(CMAKE_C_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(CMAKE_CXX_COMPILER "${ARM_TOOLS}/arm-none-eabi-g++")
 set(CMAKE_ASM_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(ARDUINO_OBJCOPY "${ARM_TOOLS}/arm-none-eabi-objcopy")
 
-set(ARDUINO_BOOTLOADER "${ARDUINO_ROOT}/hardware/samd/1.6.6/variants/${ARDUINO_BOARD}/linker_scripts/gcc/flash_with_bootloader.ld")
+set(ARDUINO_BOOTLOADER "${ARDUINO_BOARD_CORE_PATH}/variants/${ARDUINO_BOARD}/linker_scripts/gcc/flash_with_bootloader.ld")
 
 set(CMAKE_BOARD_FLAGS "-DF_CPU=${ARDUINO_FCPU} -DARDUINO=2491 -DARDUINO_M0PLUS=10605 -DARDUINO_SAMD_ZERO -DARDUINO_ARCH_SAMD -D__SAMD21G18A__ -DUSB_VID=0x2341 -DUSB_PID=0x804d -DUSBCON -DUSB_MANUFACTURER=\"Arduino LLC\" -DUSB_PRODUCT=\"\\\"Arduino Zero\\\"\"")
 set(CMAKE_C_FLAGS   "-g -Os -w -std=gnu11   -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${CMAKE_BOARD_FLAGS}")
@@ -27,17 +36,15 @@ set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 set(CMAKE_SYSTEM_NAME Generic)
 set(TUNNING_FLAGS "")
 
-set(ARDUINO_CORE_DIR "${ARDUINO_ROOT}/hardware/samd/1.6.6/cores/arduino/")
-set(ARDUINO_BOARD_DIR "${ARDUINO_ROOT}/hardware/samd/1.6.6/variants/${ARDUINO_BOARD}")
-set(ARDUINO_CMSIS_DIR "${ARDUINO_ROOT}/tools/CMSIS/4.0.0-atmel/CMSIS/Include/")
-set(ARDUINO_DEVICE_DIR "${ARDUINO_ROOT}/tools/CMSIS/4.0.0-atmel/Device/ATMEL/")
-
 set(GITDEPS "${CMAKE_CURRENT_SOURCE_DIR}/gitdeps")
 
 include_directories(${ARDUINO_CMSIS_DIR})
 include_directories(${ARDUINO_DEVICE_DIR})
 include_directories(${ARDUINO_CORE_DIR})
 include_directories(${ARDUINO_BOARD_DIR})
+
+link_directories(${ARDUINO_IDE_LIBRARIES_PATH})
+link_directories(${ARDUINO_BOARD_CORE_LIBRARIES_PATH})
 
 function(read_arduino_libraries VAR_NAME PATH)
   set(libraries)
