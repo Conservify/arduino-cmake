@@ -28,10 +28,11 @@ set(ARDUINO_OBJCOPY "${ARM_TOOLS}/arm-none-eabi-objcopy")
 
 set(ARDUINO_BOOTLOADER "${ARDUINO_BOARD_CORE_PATH}/variants/${ARDUINO_BOARD}/linker_scripts/gcc/flash_with_bootloader.ld")
 
+set(PRINTF_FLAGS -lc -u _printf_float)
 set(CMAKE_BOARD_FLAGS "-DF_CPU=${ARDUINO_FCPU} -DARDUINO=2491 -DARDUINO_M0PLUS=10605 -DARDUINO_SAMD_ZERO -DARDUINO_ARCH_SAMD -D__SAMD21G18A__ -DUSB_VID=0x2341 -DUSB_PID=0x804d -DUSBCON -DUSB_MANUFACTURER=\"Arduino LLC\" -DUSB_PRODUCT=\"\\\"Arduino Zero\\\"\"")
-set(CMAKE_C_FLAGS   "-g -Os -w -std=gnu11   -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${CMAKE_BOARD_FLAGS}")
-set(CMAKE_CXX_FLAGS "-g -Os -w -std=gnu++11 -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${CMAKE_BOARD_FLAGS} -fno-threadsafe-statics  -fno-rtti -fno-exceptions")
-set(CMAKE_ASM_FLAGS "-g -x assembler-with-cpp                                                                                                                   ${CMAKE_BOARD_FLAGS}")
+set(CMAKE_C_FLAGS   "-g -Os -w -std=gnu11   -ffunction-sections -pedantic -Werror -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${CMAKE_BOARD_FLAGS}")
+set(CMAKE_CXX_FLAGS "-g -Os -w -std=gnu++11 -ffunction-sections -pedantic -Werror -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${CMAKE_BOARD_FLAGS} -fno-threadsafe-statics  -fno-rtti -fno-exceptions")
+set(CMAKE_ASM_FLAGS "-g -x assembler-with-cpp ${CMAKE_BOARD_FLAGS}")
 set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 set(CMAKE_SYSTEM_NAME Generic)
 set(TUNNING_FLAGS "")
@@ -140,7 +141,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   endforeach()
 
   add_custom_command(TARGET ${TARGET_NAME}.elf POST_BUILD
-    COMMAND ${CMAKE_C_COMPILER} -Os -Wl,--gc-sections -save-temps -T${ARDUINO_BOOTLOADER}
+    COMMAND ${CMAKE_C_COMPILER} -Os -Wl,--gc-sections -save-temps -T${ARDUINO_BOOTLOADER} ${PRINTF_FLAGS}
     --specs=nano.specs --specs=nosys.specs -mcpu=${ARDUINO_MCU} -mthumb -Wl,--cref -Wl,--check-sections
     -Wl,--gc-sections -Wl,--unresolved-symbols=report-all -Wl,--warn-common -Wl,--warn-section-align
     -Wl,-Map,${LIBRARY_OUTPUT_PATH}/${TARGET_NAME}.map -o ${LIBRARY_OUTPUT_PATH}/${TARGET_NAME}.elf
