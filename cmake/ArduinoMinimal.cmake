@@ -133,11 +133,17 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
 
   add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
 
+  find_arduino_libraries(TARGET_LIBS "${ALL_LIBRARIES}")
+
   set(LIBRARY_DEPS)
-  foreach(LIB_PATH ${ALL_LIBRARIES})
+  foreach(LIB_PATH ${TARGET_LIBS})
     get_filename_component(LIB_NAME ${LIB_PATH} NAME)
     add_dependencies(${TARGET_NAME}.elf ${BOARD_ID}_${LIB_NAME})
-    list(APPEND LIBRARY_DEPS "${LIBRARY_OUTPUT_PATH}/lib${BOARD_ID}_${LIB_NAME}.a")
+    find_sources(LIB_SRCS ${LIB_PATH} False)
+    headers_only(HEADERS_ONLY "${LIB_SRCS}")
+    if(NOT HEADERS_ONLY)
+      list(APPEND LIBRARY_DEPS "${LIBRARY_OUTPUT_PATH}/lib${BOARD_ID}_${LIB_NAME}.a")
+    endif()
   endforeach()
 
   add_custom_command(TARGET ${TARGET_NAME}.elf POST_BUILD
@@ -223,9 +229,6 @@ function(setup_arduino_libraries VAR_NAME BOARD_ID SRCS LIBRARIES COMPILE_FLAGS 
 
     list(APPEND LIB_TARGETS ${LIB_DEPS})
     list(APPEND LIB_INCLUDES ${LIB_DEPS_INCLUDES})
-
-    message("INCL:  ${BOARD_ID} ${TARGET_LIB} ${COMPILE_FLAGS} ${LINK_FLAGS} : ${LIB_DEPS_INCLUDES}")
-
   endforeach()
 
   set(${VAR_NAME}          ${LIB_TARGETS}  PARENT_SCOPE)
@@ -235,6 +238,7 @@ endfunction()
 set(Wire_RECURSE True)
 set(Ethernet_RECURSE True)
 set(SD_RECURSE True)
+set(WiFi101_RECURSE True)
 
 function(setup_arduino_library VAR_NAME BOARD_ID LIB_PATH COMPILE_FLAGS LINK_FLAGS)
   set(LIB_TARGETS)
@@ -264,7 +268,9 @@ function(setup_arduino_library VAR_NAME BOARD_ID LIB_PATH COMPILE_FLAGS LINK_FLA
 
     find_sources(LIB_SRCS ${LIB_PATH} ${${LIB_SHORT_NAME}_RECURSE})
 
-    if(LIB_SRCS)
+    headers_only(HEADERS_ONLY "${LIB_SRCS}")
+
+    if(NOT HEADERS_ONLY)
       add_library(${TARGET_LIB_NAME} STATIC ${LIB_SRCS})
 
       if (LIB_INCLUDES)
@@ -289,6 +295,15 @@ function(setup_arduino_library VAR_NAME BOARD_ID LIB_PATH COMPILE_FLAGS LINK_FLA
 
   set(${VAR_NAME}          ${LIB_TARGETS}  PARENT_SCOPE)
   set(${VAR_NAME}_INCLUDES ${LIB_INCLUDES} PARENT_SCOPE)
+endfunction()
+
+function(headers_only VAR_NAME FILES)
+  set(${VAR_NAME} True PARENT_SCOPE)
+  foreach(temp ${FILES})
+    if(${temp} MATCHES "(.cpp|cxx|c)$")
+      set(${VAR_NAME} False PARENT_SCOPE)
+    endif()
+  endforeach()
 endfunction()
 
 function(find_sources VAR_NAME LIB_PATH RECURSE)
