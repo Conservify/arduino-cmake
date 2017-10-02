@@ -138,10 +138,12 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   set(LIBRARY_DEPS)
   foreach(LIB_PATH ${TARGET_LIBS})
     get_filename_component(LIB_NAME ${LIB_PATH} NAME)
-    add_dependencies(${TARGET_NAME}.elf ${BOARD_ID}_${LIB_NAME})
+
     find_sources(LIB_SRCS ${LIB_PATH} False)
+
     headers_only(HEADERS_ONLY "${LIB_SRCS}")
     if(NOT HEADERS_ONLY)
+      add_dependencies(${TARGET_NAME}.elf ${BOARD_ID}_${LIB_NAME})
       list(APPEND LIBRARY_DEPS "${LIBRARY_OUTPUT_PATH}/lib${BOARD_ID}_${LIB_NAME}.a")
     endif()
   endforeach()
@@ -182,9 +184,7 @@ function(find_arduino_libraries VAR_NAME LIBRARIES)
 
     foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${ARDUINO_LIBRARIES_PATH} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/libraries ${ARDUINO_EXTRA_LIBRARIES_PATH})
-      if(NOT EXISTS ${LIB_SEARCH_PATH})
-        # message(FATAL_ERROR "Missing ${LIB_SEARCH_PATH}")
-      endif()
+
       if(EXISTS ${LIB_SEARCH_PATH}/${LIBNAME}/${LIBNAME}.h)
         list(APPEND ARDUINO_LIBS ${LIB_SEARCH_PATH}/${LIBNAME})
         set(missing False)
@@ -273,6 +273,8 @@ function(setup_arduino_library VAR_NAME BOARD_ID LIB_PATH COMPILE_FLAGS LINK_FLA
     if(NOT HEADERS_ONLY)
       add_library(${TARGET_LIB_NAME} STATIC ${LIB_SRCS})
 
+      message("-- Configuring library: ${TARGET_LIB_NAME} (${LIB_PATH})")
+
       if (LIB_INCLUDES)
         string(REPLACE ";" " " LIB_INCLUDES "${LIB_INCLUDES}")
       endif()
@@ -284,8 +286,12 @@ function(setup_arduino_library VAR_NAME BOARD_ID LIB_PATH COMPILE_FLAGS LINK_FLA
       target_link_libraries(${TARGET_LIB_NAME} ${BOARD_ID}_CORE ${LIB_TARGETS})
 
       list(APPEND LIB_TARGETS ${TARGET_LIB_NAME})
+    else()
+      message("-- Configuring headers only library: ${TARGET_LIB_NAME}")
     endif()
   else()
+    message("-- Library already configured: ${TARGET_LIB_NAME}")
+
     list(APPEND LIB_TARGETS ${TARGET_LIB_NAME})
   endif()
 
@@ -322,5 +328,5 @@ function(find_sources VAR_NAME LIB_PATH RECURSE)
     file(GLOB LIB_FILES ${FILE_SEARCH_LIST})
   endif()
 
-    set(${VAR_NAME} ${LIB_FILES} PARENT_SCOPE)
+  set(${VAR_NAME} ${LIB_FILES} PARENT_SCOPE)
 endfunction()
