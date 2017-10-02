@@ -39,6 +39,11 @@ set(TUNNING_FLAGS "")
 
 set(GITDEPS "${CMAKE_CURRENT_SOURCE_DIR}/gitdeps")
 
+set(Wire_RECURSE True)
+set(Ethernet_RECURSE True)
+set(SD_RECURSE True)
+set(WiFi101_RECURSE True)
+
 include_directories(${ARDUINO_CMSIS_DIR})
 include_directories(${ARDUINO_DEVICE_DIR})
 include_directories(${ARDUINO_CORE_DIR})
@@ -113,40 +118,33 @@ add_library(core STATIC ${ARDUINO_SOURCE_FILES})
 read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
 
 macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
+  # Read everything about all the libraries we're depending on.
   read_arduino_libraries(PROJECT_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
-
   set(ALL_LIBRARIES "${GLOBAL_LIBRARIES};${PROJECT_LIBRARIES};${LIBRARIES}")
+  setup_libraries(LIBRARY_INFO "${BOARD_ID}" "${ALL_LIBRARIES}")
 
-  setup_arduino_libraries(ALL_LIBS ${BOARD_ID} "${ALL_SRCS}" "${ALL_LIBRARIES}" "${LIB_DEP_INCLUDES}" "")
-
-  set(PATHS)
-  foreach(TEMP ${ALL_LIBS_INCLUDES})
-    set(PATHS "${PATHS} ${TEMP}")
-  endforeach()
-
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${PATHS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PATHS}")
-
+  # Configure top level binrary target/dependencies.
   add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIR}/main.cpp ${SOURCE_FILES})
-
   add_custom_target(${TARGET_NAME}.elf)
-
   add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
 
-  find_arduino_libraries(TARGET_LIBS "${ALL_LIBRARIES}")
+  # Pull all library includes and tack them onto the end of our flag vars and
+  # also add them as dependencies of the top level target.
+  set(LIB_INCLUDES)
+  foreach(key ${LIBRARY_INFO})
+    set(LIB_INCLUDES "${LIB_INCLUDES} ${${key}_INCLUDES}")
 
-  set(LIBRARY_DEPS)
-  foreach(LIB_PATH ${TARGET_LIBS})
-    get_filename_component(LIB_NAME ${LIB_PATH} NAME)
+    list(GET "${key}_INFO" 3 HEADERS_ONLY)
+    list(GET "${key}_INFO" 4 LIB_TARGET_NAME)
 
-    find_sources(LIB_SRCS ${LIB_PATH} False)
-
-    headers_only(HEADERS_ONLY "${LIB_SRCS}")
     if(NOT HEADERS_ONLY)
-      add_dependencies(${TARGET_NAME}.elf ${BOARD_ID}_${LIB_NAME})
-      list(APPEND LIBRARY_DEPS "${LIBRARY_OUTPUT_PATH}/lib${BOARD_ID}_${LIB_NAME}.a")
+      add_dependencies(${TARGET_NAME}.elf ${LIB_TARGET_NAME})
+      list(APPEND LIBRARY_DEPS "${LIBRARY_OUTPUT_PATH}/lib${LIB_TARGET_NAME}.a")
     endif()
-  endforeach()
+  endforeach(key)
+
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${LIB_INCLUDES}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LIB_INCLUDES}")
 
   add_custom_command(TARGET ${TARGET_NAME}.elf POST_BUILD
     COMMAND ${CMAKE_C_COMPILER} -Os -Wl,--gc-sections -save-temps -T${ARDUINO_BOOTLOADER} ${PRINTF_FLAGS}
@@ -172,94 +170,46 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
     "${LIBRARY_OUTPUT_PATH}/${TARGET_NAME}.map")
 endmacro()
 
-function(find_arduino_libraries VAR_NAME LIBRARIES)
-  set(ARDUINO_LIBS)
-
-  foreach(LIBNAME ${LIBRARIES})
+function(library_find_path VAR_NAME LIB_NAME_OR_RELATIVE_PATH LIB_SHORT_NAME)
     get_property(LIBRARY_SEARCH_PATH
-      DIRECTORY     # Property Scope
+      DIRECTORY # Property Scope
       PROPERTY LINK_DIRECTORIES)
 
-    set(missing True)
-
-    foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${ARDUINO_LIBRARIES_PATH} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}
-                            ${CMAKE_CURRENT_SOURCE_DIR}/libraries ${ARDUINO_EXTRA_LIBRARIES_PATH})
-
-      if(EXISTS ${LIB_SEARCH_PATH}/${LIBNAME}/${LIBNAME}.h)
-        list(APPEND ARDUINO_LIBS ${LIB_SEARCH_PATH}/${LIBNAME})
-        set(missing False)
+    foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${ARDUINO_LIBRARIES_PATH} ${CMAKE_CURRENT_SOURCE_DIR}
+                            ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libraries ${ARDUINO_EXTRA_LIBRARIES_PATH})
+      if(EXISTS ${LIB_SEARCH_PATH}/${LIB_NAME_OR_RELATIVE_PATH}/${LIB_SHORT_NAME}.h)
+        set(${VAR_NAME} ${LIB_SEARCH_PATH}/${LIB_NAME_OR_RELATIVE_PATH} PARENT_SCOPE)
         break()
       endif()
-      if(EXISTS ${LIB_SEARCH_PATH}/${LIBNAME}/src/${LIBNAME}.h)
-        list(APPEND ARDUINO_LIBS ${LIB_SEARCH_PATH}/${LIBNAME})
-        set(missing False)
+      if(EXISTS ${LIB_SEARCH_PATH}/${LIB_NAME_OR_RELATIVE_PATH}/src/${LIB_SHORT_NAME}.h)
+        set(${VAR_NAME} ${LIB_SEARCH_PATH}/${LIB_NAME_OR_RELATIVE_PATH}/src PARENT_SCOPE)
         break()
       endif()
-      if(EXISTS ${LIB_SEARCH_PATH}/${LIBNAME})
-        list(APPEND ARDUINO_LIBS ${LIB_SEARCH_PATH}/${LIBNAME})
-        set(missing False)
+      if(EXISTS ${LIB_SEARCH_PATH}/${LIB_NAME_OR_RELATIVE_PATH})
+        set(${VAR_NAME} ${LIB_SEARCH_PATH}/${LIB_NAME_OR_RELATIVE_PATH} PARENT_SCOPE)
         break()
       endif()
     endforeach()
+endfunction()
 
-    if(missing)
+function(setup_libraries VAR_NAME BOARD_ID LIBRARIES)
+  set(ALL_LIBS)
+  set(ALL_LIB_TARGETS)
+  set(ALL_LIB_INCLUDES)
+
+  foreach(LIB_NAME_OR_RELATIVE_PATH ${LIBRARIES})
+    string(REGEX REPLACE ".*/" "" LIB_SHORT_NAME ${LIB_NAME_OR_RELATIVE_PATH})
+
+    library_find_path(LIB_PATH ${LIB_NAME_OR_RELATIVE_PATH} ${LIB_SHORT_NAME})
+
+    if(NOT LIB_PATH)
       foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${ARDUINO_LIBRARIES_PATH} ${CMAKE_CURRENT_SOURCE_DIR}
                               ${CMAKE_CURRENT_SOURCE_DIR}/libraries ${ARDUINO_EXTRA_LIBRARIES_PATH})
         message("Path: ${LIB_SEARCH_PATH}")
       endforeach()
-      message(FATAL_ERROR "Error finding ${LIBNAME}")
+
+      message(FATAL_ERROR "Error finding ${LIB_NAME_OR_RELATIVE_PATH}")
     endif()
-  endforeach()
-
-  if(ARDUINO_LIBS)
-    list(REMOVE_DUPLICATES ARDUINO_LIBS)
-  endif()
-
-  set(${VAR_NAME} ${ARDUINO_LIBS} PARENT_SCOPE)
-endfunction()
-
-function(setup_arduino_libraries VAR_NAME BOARD_ID SRCS LIBRARIES COMPILE_FLAGS LINK_FLAGS)
-  set(LIB_TARGETS)
-  set(LIB_INCLUDES)
-
-  find_arduino_libraries(TARGET_LIBS "${LIBRARIES}")
-
-  foreach(TARGET_LIB ${TARGET_LIBS})
-    setup_arduino_library(LIB_DEPS ${BOARD_ID} ${TARGET_LIB} "${COMPILE_FLAGS}" "${LINK_FLAGS}")
-
-    list(APPEND LIB_TARGETS ${LIB_DEPS})
-    list(APPEND LIB_INCLUDES ${LIB_DEPS_INCLUDES})
-  endforeach()
-
-  set(${VAR_NAME}          ${LIB_TARGETS}  PARENT_SCOPE)
-  set(${VAR_NAME}_INCLUDES ${LIB_INCLUDES} PARENT_SCOPE)
-endfunction()
-
-set(Wire_RECURSE True)
-set(Ethernet_RECURSE True)
-set(SD_RECURSE True)
-set(WiFi101_RECURSE True)
-
-function(setup_arduino_library VAR_NAME BOARD_ID LIB_PATH COMPILE_FLAGS LINK_FLAGS)
-  set(LIB_TARGETS)
-  set(LIB_INCLUDES)
-
-  get_filename_component(LIB_NAME ${LIB_PATH} NAME)
-
-  # SD library compatibility. I thought libraries had to have the header in the root directory?
-  if(EXISTS ${LIB_PATH}/src/${LIB_NAME}.h)
-    set(LIB_PATH "${LIB_PATH}/src")
-  endif()
-
-  set(TARGET_LIB_NAME ${BOARD_ID}_${LIB_NAME})
-
-  # Do this everytime, not just when creating the target. That way if a library
-  # is used more than once it'll get included.
-  list(APPEND LIB_INCLUDES "-I\"${LIB_PATH}\" -I\"${LIB_PATH}/utility\"")
-
-  # Create target if we don't have one yet.
-  if(NOT TARGET ${TARGET_LIB_NAME})
-    string(REGEX REPLACE ".*/" "" LIB_SHORT_NAME ${LIB_NAME})
 
     # Detect if recursion is needed
     if (NOT DEFINED ${LIB_SHORT_NAME}_RECURSE)
@@ -270,37 +220,52 @@ function(setup_arduino_library VAR_NAME BOARD_ID LIB_PATH COMPILE_FLAGS LINK_FLA
 
     headers_only(HEADERS_ONLY "${LIB_SRCS}")
 
-    if(NOT HEADERS_ONLY)
-      add_library(${TARGET_LIB_NAME} STATIC ${LIB_SRCS})
+    set(LIB_TARGET_NAME ${BOARD_ID}_${LIB_SHORT_NAME})
 
-      message("-- Configuring library: ${TARGET_LIB_NAME} (${LIB_PATH})")
+    set(LIB_INCLUDES "-I\"${LIB_PATH}\" -I\"${LIB_PATH}/utility\"")
 
-      if (LIB_INCLUDES)
-        string(REPLACE ";" " " LIB_INCLUDES "${LIB_INCLUDES}")
+    # Create target if we don't have one yet.
+    if(NOT TARGET ${LIB_TARGET_NAME})
+      if(NOT HEADERS_ONLY)
+        add_library(${LIB_TARGET_NAME} STATIC ${LIB_SRCS})
+
+        message("-- Configuring library: ${LIB_TARGET_NAME} (${LIB_PATH})")
+
+        if (LIB_INCLUDES)
+          string(REPLACE ";" " " LIB_INCLUDES "${LIB_INCLUDES}")
+        endif()
+
+        set_target_properties(${LIB_TARGET_NAME} PROPERTIES
+          COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS} ${LIB_INCLUDES} -I\"${LIB_PATH}\" -I\"${LIB_PATH}/utility\" ${COMPILE_FLAGS}"
+          LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${LINK_FLAGS}")
+
+        target_link_libraries(${LIB_TARGET_NAME} ${BOARD_ID}_CORE ${ALL_LIB_TARGETS})
+
+        list(APPEND ALL_LIB_INCLUDES ${LIB_INCLUDES})
+        list(APPEND ALL_LIB_TARGETS ${LIB_TARGET_NAME})
+      else()
+        message("-- Configuring headers only library: ${LIB_TARGET_NAME}")
       endif()
-
-      set_target_properties(${TARGET_LIB_NAME} PROPERTIES
-        COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS} ${LIB_INCLUDES} -I\"${LIB_PATH}\" -I\"${LIB_PATH}/utility\" ${COMPILE_FLAGS}"
-        LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${LINK_FLAGS}")
-
-      target_link_libraries(${TARGET_LIB_NAME} ${BOARD_ID}_CORE ${LIB_TARGETS})
-
-      list(APPEND LIB_TARGETS ${TARGET_LIB_NAME})
     else()
-      message("-- Configuring headers only library: ${TARGET_LIB_NAME}")
+      message("-- Library already configured: ${LIB_TARGET_NAME}")
+
+      list(APPEND ALL_LIB_TARGETS ${LIB_TARGET_NAME})
     endif()
-  else()
-    message("-- Library already configured: ${TARGET_LIB_NAME}")
 
-    list(APPEND LIB_TARGETS ${TARGET_LIB_NAME})
-  endif()
+    # message("-- ${LIB_SHORT_NAME} ${LIB_NAME_OR_RELATIVE_PATH}")
+    # message("   ${LIB_PATH}")
+    # message("   ${HEADERS_ONLY}")
 
-  if(LIB_TARGETS)
-    list(REMOVE_DUPLICATES LIB_TARGETS)
-  endif()
+    set(INFO ${LIB_SHORT_NAME} ${LIB_NAME_OR_RELATIVE_PATH} ${LIB_PATH} ${HEADERS_ONLY} ${LIB_TARGET_NAME})
 
-  set(${VAR_NAME}          ${LIB_TARGETS}  PARENT_SCOPE)
-  set(${VAR_NAME}_INCLUDES ${LIB_INCLUDES} PARENT_SCOPE)
+    set(LIB_${LIB_SHORT_NAME}_INFO "${INFO}" PARENT_SCOPE)
+    set(LIB_${LIB_SHORT_NAME}_SOURCES "${SRCS}" PARENT_SCOPE)
+    set(LIB_${LIB_SHORT_NAME}_INCLUDES "${LIB_INCLUDES}" PARENT_SCOPE)
+
+    list(APPEND ALL_LIBS "LIB_${LIB_SHORT_NAME}")
+  endforeach()
+
+  set(${VAR_NAME} ${ALL_LIBS} PARENT_SCOPE)
 endfunction()
 
 function(headers_only VAR_NAME FILES)
