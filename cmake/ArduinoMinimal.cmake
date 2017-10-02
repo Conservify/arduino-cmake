@@ -322,7 +322,5 @@ function(find_sources VAR_NAME LIB_PATH RECURSE)
     file(GLOB LIB_FILES ${FILE_SEARCH_LIST})
   endif()
 
-  if(LIB_FILES)
     set(${VAR_NAME} ${LIB_FILES} PARENT_SCOPE)
-  endif()
 endfunction()
