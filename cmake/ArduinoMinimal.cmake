@@ -124,7 +124,11 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   setup_libraries(LIBRARY_INFO "${BOARD_ID}" "${ALL_LIBRARIES}")
 
   # Configure top level binrary target/dependencies.
-  add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIR}/main.cpp ${SOURCE_FILES})
+  set_source_files_properties(${TARGET_SOURCE_FILES} PROPERTIES LANGUAGE CXX)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(${TARGET_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-x c++")
+  endif()
+  add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIR}/main.cpp ${TARGET_SOURCE_FILES})
   add_custom_target(${TARGET_NAME}.elf)
   add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
 
