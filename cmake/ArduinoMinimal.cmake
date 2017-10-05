@@ -1,4 +1,6 @@
-set(ARDUINO_IDE "${CMAKE_CURRENT_SOURCE_DIR}/../arduino-1.8.3")
+if(NOT ARDUINO_IDE)
+  set(ARDUINO_IDE "${CMAKE_CURRENT_SOURCE_DIR}/../arduino-1.8.3")
+endif()
 set(ARDUINO_IDE_LIBRARIES_PATH "${ARDUINO_IDE}/libraries")
 set(ARDUINO_CORE_ROOT_PATH "${ARDUINO_IDE}/packages/arduino")
 set(ARDUINO_CORE_PATH "${ARDUINO_CORE_ROOT_PATH}/hardware/samd/1.6.6")
