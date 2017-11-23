@@ -28,6 +28,9 @@ set(CMAKE_CXX_COMPILER "${ARM_TOOLS}/arm-none-eabi-g++")
 set(CMAKE_ASM_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(ARDUINO_OBJCOPY "${ARM_TOOLS}/arm-none-eabi-objcopy")
 
+SET(CMAKE_AR "${ARM_TOOLS}/arm-none-eabi-ar")
+SET(CMAKE_RANLIB "${ARM_TOOLS}/arm-none-eabi-ranlib")
+
 set(ARDUINO_BOOTLOADER "${ARDUINO_BOARD_CORE_PATH}/variants/${ARDUINO_BOARD}/linker_scripts/gcc/flash_with_bootloader.ld")
 
 set(PRINTF_FLAGS -lc -u _printf_float)
