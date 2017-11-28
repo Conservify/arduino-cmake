@@ -27,6 +27,7 @@ set(CMAKE_C_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(CMAKE_CXX_COMPILER "${ARM_TOOLS}/arm-none-eabi-g++")
 set(CMAKE_ASM_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(ARDUINO_OBJCOPY "${ARM_TOOLS}/arm-none-eabi-objcopy")
+set(ARDUINO_NM "${ARM_TOOLS}/arm-none-eabi-nm")
 
 SET(CMAKE_AR "${ARM_TOOLS}/arm-none-eabi-ar")
 SET(CMAKE_RANLIB "${ARM_TOOLS}/arm-none-eabi-ranlib")
@@ -61,6 +62,7 @@ function(read_arduino_libraries VAR_NAME PATH)
   set(libraries)
 
   set(libraries_file ${PATH}/arduino-libraries)
+  message("-- Looking for ${libraries_file}")
   if(EXISTS ${libraries_file})
     execute_process(COMMAND arduino-deps --dir ${GITDEPS} --config ${libraries_file})
 
@@ -78,6 +80,7 @@ function(read_arduino_libraries VAR_NAME PATH)
         list(APPEND libraries ${temp})
       endif()
     endforeach()
+  else()
   endif()
 
   set(${VAR_NAME} ${libraries} PARENT_SCOPE)
@@ -120,9 +123,9 @@ set(ARDUINO_SOURCE_FILES
 
 add_library(core STATIC ${ARDUINO_SOURCE_FILES})
 
-read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
-
 macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
+  message("-- Configuring ${TARGET_NAME}")
+
   # Read everything about all the libraries we're depending on.
   read_arduino_libraries(PROJECT_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
   set(ALL_LIBRARIES "${GLOBAL_LIBRARIES};${PROJECT_LIBRARIES};${LIBRARIES}")
@@ -130,9 +133,13 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
 
   # Configure top level binrary target/dependencies.
   set_source_files_properties(${TARGET_SOURCE_FILES} PROPERTIES LANGUAGE CXX)
+
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set_source_files_properties(${TARGET_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-x c++")
+    set_source_files_properties(${TARGET_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "${EXTRA_CXX_FLAGS_PROJECT} -x c++")
+  else()
+    set_source_files_properties(${TARGET_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "${EXTRA_CXX_FLAGS_PROJECT}")
   endif()
+
   add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIR}/main.cpp ${TARGET_SOURCE_FILES})
   add_custom_target(${TARGET_NAME}.elf)
   add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
@@ -147,13 +154,14 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
     list(GET "${key}_INFO" 4 LIB_TARGET_NAME)
 
     if(NOT HEADERS_ONLY)
+      message("-- Dependency ${TARGET_NAME} ${LIB_TARGET_NAME}")
       add_dependencies(${TARGET_NAME}.elf ${LIB_TARGET_NAME})
       list(APPEND LIBRARY_DEPS "${LIBRARY_OUTPUT_PATH}/lib${LIB_TARGET_NAME}.a")
     endif()
   endforeach(key)
 
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_FLAGS} ${LIB_INCLUDES}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WARNING_FLAGS} ${LIB_INCLUDES}")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_C_FLAGS_ALL} ${LIB_INCLUDES}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${EXTRA_CXX_FLAGS_ALL} ${LIB_INCLUDES}")
 
   add_custom_command(TARGET ${TARGET_NAME}.elf POST_BUILD
     COMMAND ${CMAKE_C_COMPILER} -Os -Wl,--gc-sections -save-temps -T${ARDUINO_BOOTLOADER} ${PRINTF_FLAGS}
@@ -170,6 +178,9 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   add_custom_command(TARGET ${TARGET_NAME}.bin POST_BUILD COMMAND ${ARDUINO_OBJCOPY} -O binary
     ${EXECUTABLE_OUTPUT_PATH}/${TARGET_NAME}.elf
     ${EXECUTABLE_OUTPUT_PATH}/${TARGET_NAME}.bin)
+
+  add_custom_command(TARGET ${TARGET_NAME}.bin POST_BUILD COMMAND ${ARDUINO_NM} --print-size --size-sort --radix=d
+    ${EXECUTABLE_OUTPUT_PATH}/${TARGET_NAME}.elf > ${EXECUTABLE_OUTPUT_PATH}/${TARGET_NAME}.syms)
 
   add_custom_target(${TARGET_NAME}_bin ALL DEPENDS ${TARGET_NAME}.bin)
 
