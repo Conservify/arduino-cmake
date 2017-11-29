@@ -1,59 +1,49 @@
 if(NOT ARDUINO_IDE)
   set(ARDUINO_IDE "${CMAKE_CURRENT_SOURCE_DIR}/../arduino-1.8.3")
 endif()
-set(ARDUINO_IDE_LIBRARIES_PATH "${ARDUINO_IDE}/libraries")
-set(ARDUINO_CORE_ROOT_PATH "${ARDUINO_IDE}/packages/arduino")
-set(ARDUINO_CORE_PATH "${ARDUINO_CORE_ROOT_PATH}/hardware/samd/1.6.6")
-set(ARDUINO_CORE_LIBRARIES_PATH "${ARDUINO_CORE_PATH}/libraries")
 
-set(ARDUINO_BOARD_CORE_ROOT_PATH "${ARDUINO_IDE}/packages/adafruit")
-set(ARDUINO_BOARD_CORE_PATH "${ARDUINO_BOARD_CORE_ROOT_PATH}/hardware/samd/1.0.12")
-set(ARDUINO_BOARD_CORE_LIBRARIES_PATH "${ARDUINO_BOARD_CORE_PATH}/libraries")
+set(RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build")
+set(LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build")
+set(LIBRARY_OUTPUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/build")
+set(GITDEPS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/gitdeps")
 
 set(ARDUINO_BOARD "arduino_zero")
 set(ARDUINO_MCU "cortex-m0plus")
 set(ARDUINO_FCPU "48000000L")
-set(BOARD_ID ${ARDUINO_BOARD})
-set(EXECUTABLE_OUTPUT_PATH  "${CMAKE_CURRENT_SOURCE_DIR}/build")
-set(LIBRARY_OUTPUT_PATH  "${CMAKE_CURRENT_SOURCE_DIR}/build")
 
-set(ARDUINO_CORE_DIR "${ARDUINO_BOARD_CORE_PATH}/cores/arduino/")
-set(ARDUINO_BOARD_DIR "${ARDUINO_BOARD_CORE_PATH}/variants/${ARDUINO_BOARD}")
-set(ARDUINO_CMSIS_DIR "${ARDUINO_CORE_ROOT_PATH}/tools/CMSIS/4.0.0-atmel/CMSIS/Include/")
-set(ARDUINO_DEVICE_DIR "${ARDUINO_CORE_ROOT_PATH}/tools/CMSIS/4.0.0-atmel/Device/ATMEL/")
+set(ARDUINO_IDE_LIBRARIES_PATH "${ARDUINO_IDE}/libraries")
+set(ARDUINO_TOOLS_PATH "${ARDUINO_IDE}/packages/arduino/tools")
 
-set(ARM_TOOLS "${ARDUINO_CORE_ROOT_PATH}/tools/arm-none-eabi-gcc/4.8.3-2014q1/bin")
+set(ARDUINO_BOARD_CORE_ROOT "${ARDUINO_IDE}/packages/adafruit/hardware/samd/1.0.12")
+set(ARDUINO_BOARD_CORE_LIBRARIES_PATH "${ARDUINO_BOARD_CORE_ROOT}/libraries")
+set(ARDUINO_CORE_DIRECTORY "${ARDUINO_BOARD_CORE_ROOT}/cores/arduino/")
+set(ARDUINO_BOARD_DIRECTORY "${ARDUINO_BOARD_CORE_ROOT}/variants/${ARDUINO_BOARD}")
+set(ARDUINO_BOOTLOADER "${ARDUINO_BOARD_CORE_ROOT}/variants/${ARDUINO_BOARD}/linker_scripts/gcc/flash_with_bootloader.ld")
+
+set(ARDUINO_CMSIS_DIRECTORY "${ARDUINO_TOOLS_PATH}/CMSIS/4.0.0-atmel/CMSIS/Include/")
+set(ARDUINO_DEVICE_DIRECTORY "${ARDUINO_TOOLS_PATH}/CMSIS/4.0.0-atmel/Device/ATMEL/")
+set(ARM_TOOLS "${ARDUINO_TOOLS_PATH}/arm-none-eabi-gcc/4.8.3-2014q1/bin")
 set(CMAKE_C_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(CMAKE_CXX_COMPILER "${ARM_TOOLS}/arm-none-eabi-g++")
 set(CMAKE_ASM_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(ARDUINO_OBJCOPY "${ARM_TOOLS}/arm-none-eabi-objcopy")
 set(ARDUINO_NM "${ARM_TOOLS}/arm-none-eabi-nm")
-
 SET(CMAKE_AR "${ARM_TOOLS}/arm-none-eabi-ar")
 SET(CMAKE_RANLIB "${ARM_TOOLS}/arm-none-eabi-ranlib")
-
-set(ARDUINO_BOOTLOADER "${ARDUINO_BOARD_CORE_PATH}/variants/${ARDUINO_BOARD}/linker_scripts/gcc/flash_with_bootloader.ld")
 
 set(PRINTF_FLAGS -lc -u _printf_float)
 set(CMAKE_BOARD_FLAGS "-DF_CPU=${ARDUINO_FCPU} -DARDUINO=2491 -DARDUINO_M0PLUS=10605 -DARDUINO_SAMD_ZERO -DARDUINO_ARCH_SAMD -D__SAMD21G18A__ -DUSB_VID=0x2341 -DUSB_PID=0x804d -DUSBCON -DUSB_MANUFACTURER=\"Arduino LLC\" -DUSB_PRODUCT=\"\\\"Arduino Zero\\\"\"")
 set(CMAKE_C_FLAGS   "-g -Os -std=gnu11   -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${CMAKE_BOARD_FLAGS}")
 set(CMAKE_CXX_FLAGS "-g -Os -std=gnu++11 -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${CMAKE_BOARD_FLAGS} -fno-threadsafe-statics  -fno-rtti -fno-exceptions")
 set(CMAKE_ASM_FLAGS "-g -x assembler-with-cpp ${CMAKE_BOARD_FLAGS}")
-set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
-set(CMAKE_SYSTEM_NAME Generic)
-set(TUNNING_FLAGS "")
 
-set(GITDEPS "${CMAKE_CURRENT_SOURCE_DIR}/gitdeps")
+include(LibraryFlags)
+include(Samd21)
 
-set(Wire_RECURSE True)
-set(Ethernet_RECURSE True)
-set(SD_RECURSE True)
-set(WiFi101_RECURSE True)
-
-include_directories(${ARDUINO_CMSIS_DIR})
-include_directories(${ARDUINO_DEVICE_DIR})
-include_directories(${ARDUINO_CORE_DIR})
-include_directories(${ARDUINO_BOARD_DIR})
+include_directories(${ARDUINO_CMSIS_DIRECTORY})
+include_directories(${ARDUINO_DEVICE_DIRECTORY})
+include_directories(${ARDUINO_CORE_DIRECTORY})
+include_directories(${ARDUINO_BOARD_DIRECTORY})
 
 link_directories(${ARDUINO_IDE_LIBRARIES_PATH})
 link_directories(${ARDUINO_BOARD_CORE_LIBRARIES_PATH})
@@ -64,7 +54,7 @@ function(read_arduino_libraries VAR_NAME PATH)
   set(libraries_file ${PATH}/arduino-libraries)
   message("-- Looking for ${libraries_file}")
   if(EXISTS ${libraries_file})
-    execute_process(COMMAND arduino-deps --dir ${GITDEPS} --config ${libraries_file})
+    execute_process(COMMAND arduino-deps --dir ${GITDEPS_DIRECTORY} --config ${libraries_file})
 
     link_directories(${CMAKE_SOURCE_DIR}/gitdeps)
 
@@ -87,38 +77,38 @@ function(read_arduino_libraries VAR_NAME PATH)
 endfunction()
 
 set(ARDUINO_SOURCE_FILES
-  ${ARDUINO_BOARD_DIR}/variant.cpp
-  ${ARDUINO_CORE_DIR}/pulse_asm.S
-  ${ARDUINO_CORE_DIR}/avr/dtostrf.c
-  ${ARDUINO_CORE_DIR}/wiring_shift.c
-  ${ARDUINO_CORE_DIR}/WInterrupts.c
-  ${ARDUINO_CORE_DIR}/pulse.c
-  ${ARDUINO_CORE_DIR}/cortex_handlers.c
-  ${ARDUINO_CORE_DIR}/wiring_digital.c
-  ${ARDUINO_CORE_DIR}/startup.c
-  ${ARDUINO_CORE_DIR}/hooks.c
-  ${ARDUINO_CORE_DIR}/wiring_private.c
-  ${ARDUINO_CORE_DIR}/itoa.c
-  ${ARDUINO_CORE_DIR}/delay.c
-  ${ARDUINO_CORE_DIR}/wiring_analog.c
-  ${ARDUINO_CORE_DIR}/USB/PluggableUSB.cpp
-  ${ARDUINO_CORE_DIR}/USB/USBCore.cpp
-  ${ARDUINO_CORE_DIR}/USB/samd21_host.c
-  ${ARDUINO_CORE_DIR}/USB/CDC.cpp
-  ${ARDUINO_CORE_DIR}/wiring.c
-  ${ARDUINO_CORE_DIR}/abi.cpp
-  ${ARDUINO_CORE_DIR}/Print.cpp
-  ${ARDUINO_CORE_DIR}/Reset.cpp
-  ${ARDUINO_CORE_DIR}/Stream.cpp
-  ${ARDUINO_CORE_DIR}/Tone.cpp
-  ${ARDUINO_CORE_DIR}/WMath.cpp
-  ${ARDUINO_CORE_DIR}/RingBuffer.cpp
-  ${ARDUINO_CORE_DIR}/SERCOM.cpp
-  ${ARDUINO_CORE_DIR}/Uart.cpp
-  ${ARDUINO_CORE_DIR}/WString.cpp
-  ${ARDUINO_CORE_DIR}/new.cpp
-  ${ARDUINO_CORE_DIR}/IPAddress.cpp
-  ${ARDUINO_CORE_DIR}/main.cpp
+  ${ARDUINO_BOARD_DIRECTORY}/variant.cpp
+  ${ARDUINO_CORE_DIRECTORY}/pulse_asm.S
+  ${ARDUINO_CORE_DIRECTORY}/avr/dtostrf.c
+  ${ARDUINO_CORE_DIRECTORY}/wiring_shift.c
+  ${ARDUINO_CORE_DIRECTORY}/WInterrupts.c
+  ${ARDUINO_CORE_DIRECTORY}/pulse.c
+  ${ARDUINO_CORE_DIRECTORY}/cortex_handlers.c
+  ${ARDUINO_CORE_DIRECTORY}/wiring_digital.c
+  ${ARDUINO_CORE_DIRECTORY}/startup.c
+  ${ARDUINO_CORE_DIRECTORY}/hooks.c
+  ${ARDUINO_CORE_DIRECTORY}/wiring_private.c
+  ${ARDUINO_CORE_DIRECTORY}/itoa.c
+  ${ARDUINO_CORE_DIRECTORY}/delay.c
+  ${ARDUINO_CORE_DIRECTORY}/wiring_analog.c
+  ${ARDUINO_CORE_DIRECTORY}/USB/PluggableUSB.cpp
+  ${ARDUINO_CORE_DIRECTORY}/USB/USBCore.cpp
+  ${ARDUINO_CORE_DIRECTORY}/USB/samd21_host.c
+  ${ARDUINO_CORE_DIRECTORY}/USB/CDC.cpp
+  ${ARDUINO_CORE_DIRECTORY}/wiring.c
+  ${ARDUINO_CORE_DIRECTORY}/abi.cpp
+  ${ARDUINO_CORE_DIRECTORY}/Print.cpp
+  ${ARDUINO_CORE_DIRECTORY}/Reset.cpp
+  ${ARDUINO_CORE_DIRECTORY}/Stream.cpp
+  ${ARDUINO_CORE_DIRECTORY}/Tone.cpp
+  ${ARDUINO_CORE_DIRECTORY}/WMath.cpp
+  ${ARDUINO_CORE_DIRECTORY}/RingBuffer.cpp
+  ${ARDUINO_CORE_DIRECTORY}/SERCOM.cpp
+  ${ARDUINO_CORE_DIRECTORY}/Uart.cpp
+  ${ARDUINO_CORE_DIRECTORY}/WString.cpp
+  ${ARDUINO_CORE_DIRECTORY}/new.cpp
+  ${ARDUINO_CORE_DIRECTORY}/IPAddress.cpp
+  ${ARDUINO_CORE_DIRECTORY}/main.cpp
 )
 
 add_library(core STATIC ${ARDUINO_SOURCE_FILES})
@@ -129,7 +119,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   # Read everything about all the libraries we're depending on.
   read_arduino_libraries(PROJECT_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
   set(ALL_LIBRARIES "${GLOBAL_LIBRARIES};${PROJECT_LIBRARIES};${LIBRARIES}")
-  setup_libraries(LIBRARY_INFO "${BOARD_ID}" "${ALL_LIBRARIES}")
+  setup_libraries(LIBRARY_INFO "${ARDUINO_BOARD}" "${ALL_LIBRARIES}")
 
   # Configure top level binrary target/dependencies.
   set_source_files_properties(${TARGET_SOURCE_FILES} PROPERTIES LANGUAGE CXX)
@@ -140,7 +130,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
     set_source_files_properties(${TARGET_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "${EXTRA_CXX_FLAGS_PROJECT}")
   endif()
 
-  add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIR}/main.cpp ${TARGET_SOURCE_FILES})
+  add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIRECTORY}/main.cpp ${TARGET_SOURCE_FILES})
   add_custom_target(${TARGET_NAME}.elf)
   add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
 
@@ -156,7 +146,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
     if(NOT HEADERS_ONLY)
       message("-- Dependency ${TARGET_NAME} ${LIB_TARGET_NAME}")
       add_dependencies(${TARGET_NAME}.elf ${LIB_TARGET_NAME})
-      list(APPEND LIBRARY_DEPS "${LIBRARY_OUTPUT_PATH}/lib${LIB_TARGET_NAME}.a")
+      list(APPEND LIBRARY_DEPS "${LIBRARY_OUTPUT_DIRECTORY}/lib${LIB_TARGET_NAME}.a")
     endif()
   endforeach(key)
 
@@ -167,8 +157,8 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
     COMMAND ${CMAKE_C_COMPILER} -Os -Wl,--gc-sections -save-temps -T${ARDUINO_BOOTLOADER} ${PRINTF_FLAGS}
     --specs=nano.specs --specs=nosys.specs -mcpu=${ARDUINO_MCU} -mthumb -Wl,--cref -Wl,--check-sections
     -Wl,--gc-sections -Wl,--unresolved-symbols=report-all -Wl,--warn-common -Wl,--warn-section-align
-    -Wl,-Map,${LIBRARY_OUTPUT_PATH}/${TARGET_NAME}.map -o ${LIBRARY_OUTPUT_PATH}/${TARGET_NAME}.elf
-    -lm ${LIBRARY_OUTPUT_PATH}/lib${TARGET_NAME}.a ${LIBRARY_DEPS} ${LIBRARY_OUTPUT_PATH}/libcore.a
+    -Wl,-Map,${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.map -o ${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.elf
+    -lm ${LIBRARY_OUTPUT_DIRECTORY}/lib${TARGET_NAME}.a ${LIBRARY_DEPS} ${LIBRARY_OUTPUT_DIRECTORY}/libcore.a
   )
 
   add_custom_target(${TARGET_NAME}.bin)
@@ -176,18 +166,18 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   add_dependencies(${TARGET_NAME}.bin ${TARGET_NAME}.elf)
 
   add_custom_command(TARGET ${TARGET_NAME}.bin POST_BUILD COMMAND ${ARDUINO_OBJCOPY} -O binary
-    ${EXECUTABLE_OUTPUT_PATH}/${TARGET_NAME}.elf
-    ${EXECUTABLE_OUTPUT_PATH}/${TARGET_NAME}.bin)
+    ${RUNTIME_OUTPUT_DIRECTORY}/${TARGET_NAME}.elf
+    ${RUNTIME_OUTPUT_DIRECTORY}/${TARGET_NAME}.bin)
 
   add_custom_command(TARGET ${TARGET_NAME}.bin POST_BUILD COMMAND ${ARDUINO_NM} --print-size --size-sort --radix=d
-    ${EXECUTABLE_OUTPUT_PATH}/${TARGET_NAME}.elf > ${EXECUTABLE_OUTPUT_PATH}/${TARGET_NAME}.syms)
+    ${RUNTIME_OUTPUT_DIRECTORY}/${TARGET_NAME}.elf > ${RUNTIME_OUTPUT_DIRECTORY}/${TARGET_NAME}.syms)
 
   add_custom_target(${TARGET_NAME}_bin ALL DEPENDS ${TARGET_NAME}.bin)
 
   set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES
-    "${LIBRARY_OUTPUT_PATH}/${TARGET_NAME}.elf"
-    "${LIBRARY_OUTPUT_PATH}/${TARGET_NAME}.bin"
-    "${LIBRARY_OUTPUT_PATH}/${TARGET_NAME}.map")
+    "${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.elf"
+    "${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.bin"
+    "${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.map")
 endmacro()
 
 function(library_find_path VAR_NAME LIB_NAME_OR_RELATIVE_PATH LIB_SHORT_NAME)
@@ -216,7 +206,7 @@ function(library_find_path VAR_NAME LIB_NAME_OR_RELATIVE_PATH LIB_SHORT_NAME)
     endforeach()
 endfunction()
 
-function(setup_libraries VAR_NAME BOARD_ID LIBRARIES)
+function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARIES)
   set(ALL_LIBS)
   set(ALL_LIB_TARGETS)
   set(ALL_LIB_INCLUDES)
@@ -244,7 +234,7 @@ function(setup_libraries VAR_NAME BOARD_ID LIBRARIES)
 
     headers_only(HEADERS_ONLY "${LIB_SRCS}")
 
-    set(LIB_TARGET_NAME ${BOARD_ID}_${LIB_SHORT_NAME})
+    set(LIB_TARGET_NAME ${ARDUINO_BOARD}_${LIB_SHORT_NAME})
 
     set(LIB_INCLUDES "-I\"${LIB_PATH}\" -I\"${LIB_PATH}/utility\"")
 
@@ -263,7 +253,7 @@ function(setup_libraries VAR_NAME BOARD_ID LIBRARIES)
           COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS} ${LIB_INCLUDES} -I\"${LIB_PATH}\" -I\"${LIB_PATH}/utility\" ${COMPILE_FLAGS}"
           LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${LINK_FLAGS}")
 
-        target_link_libraries(${LIB_TARGET_NAME} ${BOARD_ID}_CORE ${ALL_LIB_TARGETS})
+        target_link_libraries(${LIB_TARGET_NAME} ${ARDUINO_BOARD}_CORE ${ALL_LIB_TARGETS})
 
         list(APPEND ALL_LIB_INCLUDES ${LIB_INCLUDES})
         list(APPEND ALL_LIB_TARGETS ${LIB_TARGET_NAME})
