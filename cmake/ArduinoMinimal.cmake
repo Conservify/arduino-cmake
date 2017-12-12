@@ -23,20 +23,23 @@ set(ARDUINO_BOOTLOADER "${ARDUINO_BOARD_CORE_ROOT}/variants/${ARDUINO_BOARD}/lin
 set(ARDUINO_CMSIS_DIRECTORY "${ARDUINO_TOOLS_PATH}/CMSIS/4.0.0-atmel/CMSIS/Include/")
 set(ARDUINO_DEVICE_DIRECTORY "${ARDUINO_TOOLS_PATH}/CMSIS/4.0.0-atmel/Device/ATMEL/")
 set(ARM_TOOLS "${ARDUINO_TOOLS_PATH}/arm-none-eabi-gcc/4.8.3-2014q1/bin")
+
 set(CMAKE_C_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(CMAKE_CXX_COMPILER "${ARM_TOOLS}/arm-none-eabi-g++")
 set(CMAKE_ASM_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(ARDUINO_OBJCOPY "${ARM_TOOLS}/arm-none-eabi-objcopy")
 set(ARDUINO_NM "${ARM_TOOLS}/arm-none-eabi-nm")
+
 SET(CMAKE_AR "${ARM_TOOLS}/arm-none-eabi-ar")
 SET(CMAKE_RANLIB "${ARM_TOOLS}/arm-none-eabi-ranlib")
 
 set(PRINTF_FLAGS -lc -u _printf_float)
+
 set(ARDUINO_USB_STRING_FLAGS "-DUSB_MANUFACTURER=\"Arduino LLC\" -DUSB_PRODUCT=\"\\\"Arduino Zero\\\"\"")
-set(CMAKE_BOARD_FLAGS "-DF_CPU=${ARDUINO_FCPU} -DARDUINO=2491 -DARDUINO_M0PLUS=10605 -DARDUINO_SAMD_ZERO -DARDUINO_ARCH_SAMD -D__SAMD21G18A__ -DUSB_VID=0x2341 -DUSB_PID=0x804d -DUSBCON")
-set(CMAKE_C_FLAGS   "-g -Os -std=gnu11   -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${CMAKE_BOARD_FLAGS}")
-set(CMAKE_CXX_FLAGS "-g -Os -std=gnu++11 -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${CMAKE_BOARD_FLAGS} -fno-threadsafe-statics  -fno-rtti -fno-exceptions")
-set(CMAKE_ASM_FLAGS "-g -x assembler-with-cpp ${CMAKE_BOARD_FLAGS}")
+set(ARDUINO_BOARD_FLAGS -DF_CPU=${ARDUINO_FCPU} -DARDUINO=2491 -DARDUINO_M0PLUS=10605 -DARDUINO_SAMD_ZERO -DARDUINO_ARCH_SAMD -D__SAMD21G18A__ -DUSB_VID=0x2341 -DUSB_PID=0x804d -DUSBCON)
+set(ARDUINO_C_FLAGS -g -Os -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${ARDUINO_BOARD_FLAGS})
+set(ARDUINO_CXX_FLAGS ${ARDUINO_C_FLAGS} -fno-threadsafe-statics  -fno-rtti -fno-exceptions)
+set(ARDUINO_ASM_FLAGS -g -x assembler-with-cpp ${ARDUINO_BOARD_FLAGS})
 
 include(LibraryFlags)
 include(Samd21)
@@ -71,7 +74,6 @@ function(read_arduino_libraries VAR_NAME PATH)
         list(APPEND libraries ${temp})
       endif()
     endforeach()
-  else()
   endif()
 
   set(${VAR_NAME} ${libraries} PARENT_SCOPE)
@@ -113,6 +115,11 @@ set(ARDUINO_SOURCE_FILES
 )
 
 add_library(core STATIC ${ARDUINO_SOURCE_FILES})
+target_compile_options(core PRIVATE ${ARDUINO_CXX_FLAGS})
+set_target_properties(core PROPERTIES C_STANDARD 11)
+set_target_properties(core PROPERTIES CXX_STANDARD 11)
+
+read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
 
 macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   message("-- Configuring ${TARGET_NAME}")
@@ -124,7 +131,13 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
 
   set_source_files_properties(${TARGET_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "${EXTRA_CXX_FLAGS_PROJECT}")
 
+  # Configure top level binrary target/dependencies.
   add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIRECTORY}/main.cpp ${TARGET_SOURCE_FILES})
+  set_target_properties(${TARGET_NAME} PROPERTIES C_STANDARD 11)
+  set_target_properties(${TARGET_NAME} PROPERTIES CXX_STANDARD 11)
+
+  target_compile_options(${TARGET_NAME} PRIVATE ${ARDUINO_CXX_FLAGS})
+
   add_custom_target(${TARGET_NAME}.elf)
   add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
 
@@ -132,7 +145,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   # also add them as dependencies of the top level target.
   set(LIB_INCLUDES)
   foreach(key ${LIBRARY_INFO})
-    set(LIB_INCLUDES "${LIB_INCLUDES} ${${key}_INCLUDES}")
+    set(LIB_INCLUDES "${LIB_INCLUDES};${${key}_INCLUDES}")
 
     list(GET "${key}_INFO" 3 HEADERS_ONLY)
     list(GET "${key}_INFO" 4 LIB_TARGET_NAME)
@@ -144,8 +157,16 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
     endif()
   endforeach(key)
 
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_C_FLAGS_ALL} ${LIB_INCLUDES}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${EXTRA_CXX_FLAGS_ALL} ${LIB_INCLUDES}")
+  foreach(key ${LIBRARY_INFO})
+    list(GET "${key}_INFO" 3 HEADERS_ONLY)
+    list(GET "${key}_INFO" 4 LIB_TARGET_NAME)
+
+    if(NOT HEADERS_ONLY)
+      target_include_directories(${LIB_TARGET_NAME} PUBLIC "${LIB_INCLUDES}")
+    endif()
+  endforeach(key)
+
+  target_include_directories(${TARGET_NAME} PUBLIC "${LIB_INCLUDES}")
 
   add_custom_command(TARGET ${TARGET_NAME}.elf POST_BUILD
     COMMAND ${CMAKE_C_COMPILER} -Os -Wl,--gc-sections -save-temps -T${ARDUINO_BOOTLOADER} ${PRINTF_FLAGS}
@@ -178,6 +199,8 @@ function(library_find_path VAR_NAME LIB_NAME_OR_RELATIVE_PATH LIB_SHORT_NAME)
     get_property(LIBRARY_SEARCH_PATH
       DIRECTORY # Property Scope
       PROPERTY LINK_DIRECTORIES)
+
+    set(${VAR_NAME} "" PARENT_SCOPE)
 
     foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${ARDUINO_LIBRARIES_PATH} ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libraries ${ARDUINO_EXTRA_LIBRARIES_PATH})
@@ -230,27 +253,27 @@ function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARIES)
 
     set(LIB_TARGET_NAME ${ARDUINO_BOARD}_${LIB_SHORT_NAME})
 
-    set(LIB_INCLUDES "-I\"${LIB_PATH}\" -I\"${LIB_PATH}/utility\"")
+    if(EXISTS ${LIB_PATH}/utility)
+    set(LIB_INCLUDES "${LIB_PATH};${LIB_PATH}/utility")
+    else()
+    set(LIB_INCLUDES "${LIB_PATH}")
+    endif()
 
     # Create target if we don't have one yet.
     if(NOT TARGET ${LIB_TARGET_NAME})
       if(NOT HEADERS_ONLY)
         add_library(${LIB_TARGET_NAME} STATIC ${LIB_SRCS})
+        set_target_properties(${LIB_TARGET_NAME} PROPERTIES C_STANDARD 11)
+        set_target_properties(${LIB_TARGET_NAME} PROPERTIES CXX_STANDARD 11)
 
         message("-- Configuring library: ${LIB_TARGET_NAME} (${LIB_PATH})")
 
-        if (LIB_INCLUDES)
-          string(REPLACE ";" " " LIB_INCLUDES "${LIB_INCLUDES}")
-        endif()
+        target_compile_options(${LIB_TARGET_NAME} PRIVATE ${ARDUINO_CXX_FLAGS})
 
         set_target_properties(${LIB_TARGET_NAME} PROPERTIES
-          COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS} ${LIB_INCLUDES} -I\"${LIB_PATH}\" -I\"${LIB_PATH}/utility\" ${COMPILE_FLAGS}"
           LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${LINK_FLAGS}")
 
-        target_link_libraries(${LIB_TARGET_NAME} ${ARDUINO_BOARD}_CORE ${ALL_LIB_TARGETS})
-
-        list(APPEND ALL_LIB_INCLUDES ${LIB_INCLUDES})
-        list(APPEND ALL_LIB_TARGETS ${LIB_TARGET_NAME})
+        target_link_libraries(${LIB_TARGET_NAME} ${BOARD_ID}_CORE ${ALL_LIB_TARGETS})
       else()
         message("-- Configuring headers only library: ${LIB_TARGET_NAME}")
       endif()
