@@ -40,14 +40,10 @@ set(ARDUINO_BOARD_FLAGS "-DF_CPU=${ARDUINO_FCPU} -DARDUINO=2491 -DARDUINO_M0PLUS
 set(ARDUINO_C_FLAGS "-g -Os -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${ARDUINO_BOARD_FLAGS}")
 set(ARDUINO_CXX_FLAGS "${ARDUINO_C_FLAGS} -fno-threadsafe-statics  -fno-rtti -fno-exceptions")
 set(ARDUINO_ASM_FLAGS "-g -x assembler-with-cpp ${ARDUINO_BOARD_FLAGS}")
+set(ARDUINO_INCLUDES ${ARDUINO_CMSIS_DIRECTORY} ${ARDUINO_DEVICE_DIRECTORY} ${ARDUINO_CORE_DIRECTORY} ${ARDUINO_BOARD_DIRECTORY})
 
 include(LibraryFlags)
 include(Samd21)
-
-include_directories(${ARDUINO_CMSIS_DIRECTORY})
-include_directories(${ARDUINO_DEVICE_DIRECTORY})
-include_directories(${ARDUINO_CORE_DIRECTORY})
-include_directories(${ARDUINO_BOARD_DIRECTORY})
 
 link_directories(${ARDUINO_IDE_LIBRARIES_PATH})
 link_directories(${ARDUINO_BOARD_CORE_LIBRARIES_PATH})
@@ -129,6 +125,7 @@ set_target_properties(core PROPERTIES C_STANDARD 11)
 set_target_properties(core PROPERTIES CXX_STANDARD 11)
 apply_compile_flags("${ARDUINO_SOURCE_FILES}")
 read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(core PUBLIC "${ARDUINO_INCLUDES}")
 
 macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   message("-- Configuring ${TARGET_NAME}")
@@ -149,7 +146,8 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
 
   # Pull all library includes and tack them onto the end of our flag vars and
   # also add them as dependencies of the top level target.
-  set(LIB_INCLUDES)
+  set(LIB_INCLUDES ${ARDUINO_CMSIS_DIRECTORY} ${ARDUINO_DEVICE_DIRECTORY} ${ARDUINO_CORE_DIRECTORY} ${ARDUINO_BOARD_DIRECTORY})
+
   foreach(key ${LIBRARY_INFO})
     set(LIB_INCLUDES "${LIB_INCLUDES};${${key}_INCLUDES}")
 
@@ -232,7 +230,6 @@ endfunction()
 function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARIES)
   set(ALL_LIBS)
   set(ALL_LIB_TARGETS)
-  set(ALL_LIB_INCLUDES)
 
   foreach(LIB_NAME_OR_RELATIVE_PATH ${LIBRARIES})
     string(REGEX REPLACE ".*/" "" LIB_SHORT_NAME ${LIB_NAME_OR_RELATIVE_PATH})
