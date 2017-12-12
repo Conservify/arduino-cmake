@@ -36,10 +36,10 @@ SET(CMAKE_RANLIB "${ARM_TOOLS}/arm-none-eabi-ranlib")
 set(PRINTF_FLAGS -lc -u _printf_float)
 
 set(ARDUINO_USB_STRING_FLAGS "-DUSB_MANUFACTURER=\"Arduino LLC\" -DUSB_PRODUCT=\"\\\"Arduino Zero\\\"\"")
-set(ARDUINO_BOARD_FLAGS -DF_CPU=${ARDUINO_FCPU} -DARDUINO=2491 -DARDUINO_M0PLUS=10605 -DARDUINO_SAMD_ZERO -DARDUINO_ARCH_SAMD -D__SAMD21G18A__ -DUSB_VID=0x2341 -DUSB_PID=0x804d -DUSBCON)
-set(ARDUINO_C_FLAGS -g -Os -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${ARDUINO_BOARD_FLAGS})
-set(ARDUINO_CXX_FLAGS ${ARDUINO_C_FLAGS} -fno-threadsafe-statics  -fno-rtti -fno-exceptions)
-set(ARDUINO_ASM_FLAGS -g -x assembler-with-cpp ${ARDUINO_BOARD_FLAGS})
+set(ARDUINO_BOARD_FLAGS "-DF_CPU=${ARDUINO_FCPU} -DARDUINO=2491 -DARDUINO_M0PLUS=10605 -DARDUINO_SAMD_ZERO -DARDUINO_ARCH_SAMD -D__SAMD21G18A__ -DUSB_VID=0x2341 -DUSB_PID=0x804d -DUSBCON")
+set(ARDUINO_C_FLAGS "-g -Os -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${ARDUINO_BOARD_FLAGS}")
+set(ARDUINO_CXX_FLAGS "${ARDUINO_C_FLAGS} -fno-threadsafe-statics  -fno-rtti -fno-exceptions")
+set(ARDUINO_ASM_FLAGS "-g -x assembler-with-cpp ${ARDUINO_BOARD_FLAGS}")
 
 include(LibraryFlags)
 include(Samd21)
@@ -111,14 +111,23 @@ set(ARDUINO_SOURCE_FILES
   ${ARDUINO_CORE_DIRECTORY}/WString.cpp
   ${ARDUINO_CORE_DIRECTORY}/new.cpp
   ${ARDUINO_CORE_DIRECTORY}/IPAddress.cpp
-  ${ARDUINO_CORE_DIRECTORY}/main.cpp
 )
 
+function(apply_compile_flags FILES)
+    foreach(file ${FILES})
+        if(${file} MATCHES ".c$")
+            set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${ARDUINO_C_FLAGS}")
+        endif()
+        if(${file} MATCHES ".cpp$")
+            set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${ARDUINO_CXX_FLAGS}")
+        endif()
+    endforeach()
+endfunction()
+
 add_library(core STATIC ${ARDUINO_SOURCE_FILES})
-target_compile_options(core PRIVATE ${ARDUINO_CXX_FLAGS})
 set_target_properties(core PROPERTIES C_STANDARD 11)
 set_target_properties(core PROPERTIES CXX_STANDARD 11)
-
+apply_compile_flags("${ARDUINO_SOURCE_FILES}")
 read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
 
 macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
@@ -129,14 +138,11 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   set(ALL_LIBRARIES "${GLOBAL_LIBRARIES};${PROJECT_LIBRARIES};${LIBRARIES}")
   setup_libraries(LIBRARY_INFO "${ARDUINO_BOARD}" "${ALL_LIBRARIES}")
 
-  set_source_files_properties(${TARGET_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "${EXTRA_CXX_FLAGS_PROJECT}")
-
   # Configure top level binrary target/dependencies.
   add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIRECTORY}/main.cpp ${TARGET_SOURCE_FILES})
   set_target_properties(${TARGET_NAME} PROPERTIES C_STANDARD 11)
   set_target_properties(${TARGET_NAME} PROPERTIES CXX_STANDARD 11)
-
-  target_compile_options(${TARGET_NAME} PRIVATE ${ARDUINO_CXX_FLAGS})
+  apply_compile_flags("${ARDUINO_CORE_DIRECTORY}/main.cpp;${SOURCE_FILES}")
 
   add_custom_target(${TARGET_NAME}.elf)
   add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
@@ -268,7 +274,7 @@ function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARIES)
 
         message("-- Configuring library: ${LIB_TARGET_NAME} (${LIB_PATH})")
 
-        target_compile_options(${LIB_TARGET_NAME} PRIVATE ${ARDUINO_CXX_FLAGS})
+        apply_compile_flags("${LIB_SRCS}")
 
         set_target_properties(${LIB_TARGET_NAME} PROPERTIES
           LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${LINK_FLAGS}")
