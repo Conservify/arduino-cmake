@@ -12,17 +12,19 @@ set(ARDUINO_MCU "cortex-m0plus")
 set(ARDUINO_FCPU "48000000L")
 
 set(ARDUINO_IDE_LIBRARIES_PATH "${ARDUINO_IDE}/libraries")
-set(ARDUINO_TOOLS_PATH "${ARDUINO_IDE}/packages/arduino/tools")
 
-set(ARDUINO_BOARD_CORE_ROOT "${ARDUINO_IDE}/packages/adafruit/hardware/samd/1.0.12")
+set(ARDUINO_PACKAGES_PATH "${ARDUINO_IDE}/packages")
+
+set(ARDUINO_TOOLS_PATH "${ARDUINO_PACKAGES_PATH}/arduino/tools")
+set(ARM_TOOLS "${ARDUINO_TOOLS_PATH}/arm-none-eabi-gcc/4.8.3-2014q1/bin")
+set(ARDUINO_CMSIS_DIRECTORY "${ARDUINO_TOOLS_PATH}/CMSIS/4.5.0/CMSIS/Include/")
+set(ARDUINO_DEVICE_DIRECTORY "${ARDUINO_TOOLS_PATH}/CMSIS-Atmel/1.1.0/CMSIS/Device/ATMEL")
+
+set(ARDUINO_BOARD_CORE_ROOT "${ARDUINO_PACKAGES_PATH}/adafruit/hardware/samd/1.0.22")
 set(ARDUINO_BOARD_CORE_LIBRARIES_PATH "${ARDUINO_BOARD_CORE_ROOT}/libraries")
 set(ARDUINO_CORE_DIRECTORY "${ARDUINO_BOARD_CORE_ROOT}/cores/arduino/")
 set(ARDUINO_BOARD_DIRECTORY "${ARDUINO_BOARD_CORE_ROOT}/variants/${ARDUINO_BOARD}")
 set(ARDUINO_BOOTLOADER "${ARDUINO_BOARD_CORE_ROOT}/variants/${ARDUINO_BOARD}/linker_scripts/gcc/flash_with_bootloader.ld")
-
-set(ARDUINO_CMSIS_DIRECTORY "${ARDUINO_TOOLS_PATH}/CMSIS/4.0.0-atmel/CMSIS/Include/")
-set(ARDUINO_DEVICE_DIRECTORY "${ARDUINO_TOOLS_PATH}/CMSIS/4.0.0-atmel/Device/ATMEL/")
-set(ARM_TOOLS "${ARDUINO_TOOLS_PATH}/arm-none-eabi-gcc/4.8.3-2014q1/bin")
 
 set(CMAKE_C_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(CMAKE_CXX_COMPILER "${ARM_TOOLS}/arm-none-eabi-g++")
@@ -35,12 +37,12 @@ SET(CMAKE_RANLIB "${ARM_TOOLS}/arm-none-eabi-ranlib")
 
 set(PRINTF_FLAGS -lc -u _printf_float)
 
+set(ARDUINO_INCLUDES ${ARDUINO_CMSIS_DIRECTORY} ${ARDUINO_DEVICE_DIRECTORY} ${ARDUINO_CORE_DIRECTORY} ${ARDUINO_BOARD_DIRECTORY})
 set(ARDUINO_USB_STRING_FLAGS "-DUSB_MANUFACTURER=\"Arduino LLC\" -DUSB_PRODUCT=\"\\\"Arduino Zero\\\"\"")
 set(ARDUINO_BOARD_FLAGS "-DF_CPU=${ARDUINO_FCPU} -DARDUINO=2491 -DARDUINO_M0PLUS=10605 -DARDUINO_SAMD_ZERO -DARDUINO_ARCH_SAMD -D__SAMD21G18A__ -DUSB_VID=0x2341 -DUSB_PID=0x804d -DUSBCON")
 set(ARDUINO_C_FLAGS "-g -Os -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${ARDUINO_BOARD_FLAGS}")
 set(ARDUINO_CXX_FLAGS "${ARDUINO_C_FLAGS} -fno-threadsafe-statics  -fno-rtti -fno-exceptions")
 set(ARDUINO_ASM_FLAGS "-g -x assembler-with-cpp ${ARDUINO_BOARD_FLAGS}")
-set(ARDUINO_INCLUDES ${ARDUINO_CMSIS_DIRECTORY} ${ARDUINO_DEVICE_DIRECTORY} ${ARDUINO_CORE_DIRECTORY} ${ARDUINO_BOARD_DIRECTORY})
 
 include(LibraryFlags)
 include(Samd21)
@@ -117,6 +119,10 @@ function(apply_compile_flags FILES)
         if(${file} MATCHES ".cpp$")
             set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${ARDUINO_CXX_FLAGS}")
         endif()
+        if(${file} MATCHES ".s$")
+            message("${file}")
+            set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${ARDUINO_ASM_FLAGS}")
+        endif()
     endforeach()
 endfunction()
 
@@ -177,7 +183,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
     --specs=nano.specs --specs=nosys.specs -mcpu=${ARDUINO_MCU} -mthumb -Wl,--cref -Wl,--check-sections
     -Wl,--gc-sections -Wl,--unresolved-symbols=report-all -Wl,--warn-common -Wl,--warn-section-align
     -Wl,-Map,${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.map -o ${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.elf
-    -lm ${LIBRARY_OUTPUT_DIRECTORY}/lib${TARGET_NAME}.a ${LIBRARY_DEPS} ${LIBRARY_OUTPUT_DIRECTORY}/libcore.a
+    -lm ${LIBRARY_OUTPUT_DIRECTORY}/lib${TARGET_NAME}.a ${LIBRARY_DEPS} ${LIBRARY_OUTPUT_DIRECTORY}/libcore.a 
   )
 
   add_custom_target(${TARGET_NAME}.bin)
