@@ -63,7 +63,10 @@ function(read_arduino_libraries VAR_NAME PATH)
     file(READ ${libraries_file} libraries_raw)
     STRING(REGEX REPLACE "\n" ";" libraries_raw "${libraries_raw}")
 
-    foreach(temp ${libraries_raw})
+    foreach(fields ${libraries_raw})
+      separate_arguments(fields)
+      list(GET fields 0 temp)
+
       if(${temp} MATCHES "^https?.+")
         string(REGEX REPLACE ".*/" "" short_name ${temp})
         string(REGEX REPLACE ".git" "" short_name ${short_name})
