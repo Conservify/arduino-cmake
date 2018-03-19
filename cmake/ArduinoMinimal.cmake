@@ -1,11 +1,14 @@
 if(NOT ARDUINO_IDE)
-  set(ARDUINO_IDE "${CMAKE_CURRENT_SOURCE_DIR}/../arduino-1.8.3")
+  set(ARDUINO_IDE "${PROJECT_SOURCE_DIR}/../arduino-1.8.3")
 endif()
 
-set(RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build")
-set(LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build")
-set(LIBRARY_OUTPUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/build")
-set(GITDEPS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/gitdeps")
+message("Src: ${CMAKE_CURRENT_SOURCE_DIR}")
+message("Src: ${PROJECT_SOURCE_DIR}")
+message("IDE: ${ARDUINO_IDE}")
+
+set(RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/build")
+set(LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/build")
+set(GITDEPS_DIRECTORY "${PROJECT_SOURCE_DIR}/gitdeps")
 
 set(ARDUINO_BOARD "arduino_zero")
 set(ARDUINO_MCU "cortex-m0plus")
@@ -129,12 +132,20 @@ function(apply_compile_flags FILES)
     endforeach()
 endfunction()
 
-add_library(core STATIC ${ARDUINO_SOURCE_FILES})
-set_target_properties(core PROPERTIES C_STANDARD 11)
-set_target_properties(core PROPERTIES CXX_STANDARD 11)
-apply_compile_flags("${ARDUINO_SOURCE_FILES}")
-read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(core PUBLIC "${ARDUINO_INCLUDES}")
+if(NOT TARGET core)
+  add_library(core STATIC ${ARDUINO_SOURCE_FILES})
+  set_target_properties(core PROPERTIES C_STANDARD 11)
+  set_target_properties(core PROPERTIES CXX_STANDARD 11)
+  set_target_properties(core
+      PROPERTIES
+      ARCHIVE_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+      LIBRARY_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+      RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+  )
+  apply_compile_flags("${ARDUINO_SOURCE_FILES}")
+  read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
+  target_include_directories(core PUBLIC "${ARDUINO_INCLUDES}")
+endif()
 
 macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   message("-- Configuring ${TARGET_NAME}")
@@ -148,6 +159,12 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIRECTORY}/main.cpp ${TARGET_SOURCE_FILES})
   set_target_properties(${TARGET_NAME} PROPERTIES C_STANDARD 11)
   set_target_properties(${TARGET_NAME} PROPERTIES CXX_STANDARD 11)
+  set_target_properties(${TARGET_NAME}
+      PROPERTIES
+      ARCHIVE_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+      LIBRARY_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+      RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+  )
   apply_compile_flags("${ARDUINO_CORE_DIRECTORY}/main.cpp;${SOURCE_FILES}")
 
   add_custom_target(${TARGET_NAME}.elf)
@@ -215,8 +232,8 @@ function(library_find_path VAR_NAME LIB_NAME_OR_RELATIVE_PATH LIB_SHORT_NAME)
 
     set(${VAR_NAME} "" PARENT_SCOPE)
 
-    foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${ARDUINO_LIBRARIES_PATH} ${CMAKE_CURRENT_SOURCE_DIR}
-                            ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libraries ${ARDUINO_EXTRA_LIBRARIES_PATH})
+    foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${CMAKE_CURRENT_SOURCE_DIR}
+                            ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libraries)
       if(EXISTS ${LIB_SEARCH_PATH}/${LIB_NAME_OR_RELATIVE_PATH}/${LIB_SHORT_NAME}.h)
         set(${VAR_NAME} ${LIB_SEARCH_PATH}/${LIB_NAME_OR_RELATIVE_PATH} PARENT_SCOPE)
         break()
@@ -249,8 +266,7 @@ function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARIES)
     library_find_path(LIB_PATH ${LIB_NAME_OR_RELATIVE_PATH} ${LIB_SHORT_NAME})
 
     if(NOT LIB_PATH)
-      foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${ARDUINO_LIBRARIES_PATH} ${CMAKE_CURRENT_SOURCE_DIR}
-                              ${CMAKE_CURRENT_SOURCE_DIR}/libraries ${ARDUINO_EXTRA_LIBRARIES_PATH})
+      foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libraries)
         message("Path: ${LIB_SEARCH_PATH}")
       endforeach()
 
@@ -280,6 +296,12 @@ function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARIES)
         add_library(${LIB_TARGET_NAME} STATIC ${LIB_SRCS})
         set_target_properties(${LIB_TARGET_NAME} PROPERTIES C_STANDARD 11)
         set_target_properties(${LIB_TARGET_NAME} PROPERTIES CXX_STANDARD 11)
+        set_target_properties(${LIB_TARGET_NAME}
+            PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+            LIBRARY_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+            RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+        )
 
         message("-- Configuring library: ${LIB_TARGET_NAME} (${LIB_PATH})")
 
