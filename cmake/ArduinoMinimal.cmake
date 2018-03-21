@@ -2,10 +2,6 @@ if(NOT ARDUINO_IDE)
   set(ARDUINO_IDE "${PROJECT_SOURCE_DIR}/../arduino-1.8.3")
 endif()
 
-message("Src: ${CMAKE_CURRENT_SOURCE_DIR}")
-message("Src: ${PROJECT_SOURCE_DIR}")
-message("IDE: ${ARDUINO_IDE}")
-
 set(RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/build")
 set(LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/build")
 set(GITDEPS_DIRECTORY "${PROJECT_SOURCE_DIR}/gitdeps")
@@ -29,9 +25,6 @@ set(ARDUINO_CORE_DIRECTORY "${ARDUINO_BOARD_CORE_ROOT}/cores/arduino/")
 set(ARDUINO_BOARD_DIRECTORY "${ARDUINO_BOARD_CORE_ROOT}/variants/${ARDUINO_BOARD}")
 set(ARDUINO_BOOTLOADER "${ARDUINO_BOARD_CORE_ROOT}/variants/${ARDUINO_BOARD}/linker_scripts/gcc/flash_with_bootloader.ld")
 
-set(CMAKE_C_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
-set(CMAKE_CXX_COMPILER "${ARM_TOOLS}/arm-none-eabi-g++")
-set(CMAKE_ASM_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
 set(ARDUINO_OBJCOPY "${ARM_TOOLS}/arm-none-eabi-objcopy")
 set(ARDUINO_NM "${ARM_TOOLS}/arm-none-eabi-nm")
 
@@ -117,43 +110,47 @@ set(ARDUINO_SOURCE_FILES
   ${ARDUINO_CORE_DIRECTORY}/IPAddress.cpp
 )
 
-function(apply_compile_flags FILES)
+function(apply_compile_flags FILES NEW_C_FLAGS NEW_CXX_FLAGS NEW_ASM_FLAGS)
     foreach(file ${FILES})
         if(${file} MATCHES ".c$")
-            set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${ARDUINO_C_FLAGS}")
+            set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${NEW_C_FLAGS}")
         endif()
         if(${file} MATCHES ".cpp$")
-            set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${ARDUINO_CXX_FLAGS}")
+            set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${NEW_CXX_FLAGS}")
         endif()
         if(${file} MATCHES ".s$")
-            message("${file}")
-            set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${ARDUINO_ASM_FLAGS}")
+            set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${NEW_ASM_FLAGS}")
         endif()
     endforeach()
 endfunction()
 
-if(NOT TARGET core)
-  add_library(core STATIC ${ARDUINO_SOURCE_FILES})
-  set_target_properties(core PROPERTIES C_STANDARD 11)
-  set_target_properties(core PROPERTIES CXX_STANDARD 11)
-  set_target_properties(core
-      PROPERTIES
-      ARCHIVE_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
-      LIBRARY_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
-      RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
-  )
-  apply_compile_flags("${ARDUINO_SOURCE_FILES}")
-  read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
-  target_include_directories(core PUBLIC "${ARDUINO_INCLUDES}")
-endif()
-
 macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
+  set(CMAKE_C_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
+  set(CMAKE_CXX_COMPILER "${ARM_TOOLS}/arm-none-eabi-g++")
+  set(CMAKE_ASM_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
+
+  if(NOT TARGET core)
+    message("-- Configuring Arduino core")
+    add_library(core STATIC ${ARDUINO_SOURCE_FILES})
+    set_target_properties(core PROPERTIES C_STANDARD 11)
+    set_target_properties(core PROPERTIES CXX_STANDARD 11)
+    set_target_properties(core
+        PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+        LIBRARY_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+        RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+    )
+    apply_compile_flags("${ARDUINO_SOURCE_FILES}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS})
+    read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
+    target_include_directories(core PUBLIC "${ARDUINO_INCLUDES}")
+  endif()
+
   message("-- Configuring ${TARGET_NAME}")
 
   # Read everything about all the libraries we're depending on.
   read_arduino_libraries(PROJECT_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
   set(ALL_LIBRARIES "${GLOBAL_LIBRARIES};${PROJECT_LIBRARIES};${LIBRARIES}")
-  setup_libraries(LIBRARY_INFO "${ARDUINO_BOARD}" "${ALL_LIBRARIES}")
+  setup_libraries(LIBRARY_INFO "${ARDUINO_BOARD}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS} "${ALL_LIBRARIES}")
 
   # Configure top level binrary target/dependencies.
   add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIRECTORY}/main.cpp ${TARGET_SOURCE_FILES})
@@ -165,7 +162,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
       LIBRARY_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
       RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
   )
-  apply_compile_flags("${ARDUINO_CORE_DIRECTORY}/main.cpp;${SOURCE_FILES}")
+  apply_compile_flags("${ARDUINO_CORE_DIRECTORY}/main.cpp;${SOURCE_FILES}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS})
 
   add_custom_target(${TARGET_NAME}.elf)
   add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
@@ -253,7 +250,7 @@ function(library_find_path VAR_NAME LIB_NAME_OR_RELATIVE_PATH LIB_SHORT_NAME)
     endforeach()
 endfunction()
 
-function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARIES)
+function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARY_C_FLAGS LIBRARY_CXX_FLAGS LIBRARY_ASM_FLAGS LIBRARIES)
   set(ALL_LIBS)
   set(ALL_LIB_TARGETS)
 
@@ -305,7 +302,7 @@ function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARIES)
 
         message("-- Configuring library: ${LIB_TARGET_NAME} (${LIB_PATH})")
 
-        apply_compile_flags("${LIB_SRCS}")
+        apply_compile_flags("${LIB_SRCS}" "${LIBRARY_C_FLAGS}" "${LIBRARY_CXX_FLAGS}" "${LIBRARY_ASM_FLAGS}")
 
         set_target_properties(${LIB_TARGET_NAME} PROPERTIES
           LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${LINK_FLAGS}")
