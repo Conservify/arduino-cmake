@@ -28,16 +28,13 @@ set(ARDUINO_BOOTLOADER "${ARDUINO_BOARD_CORE_ROOT}/variants/${ARDUINO_BOARD}/lin
 set(ARDUINO_OBJCOPY "${ARM_TOOLS}/arm-none-eabi-objcopy")
 set(ARDUINO_NM "${ARM_TOOLS}/arm-none-eabi-nm")
 
-SET(CMAKE_AR "${ARM_TOOLS}/arm-none-eabi-ar")
-SET(CMAKE_RANLIB "${ARM_TOOLS}/arm-none-eabi-ranlib")
-
 set(PRINTF_FLAGS -lc -u _printf_float)
 
 set(ARDUINO_INCLUDES ${ARDUINO_CMSIS_DIRECTORY} ${ARDUINO_DEVICE_DIRECTORY} ${ARDUINO_CORE_DIRECTORY} ${ARDUINO_BOARD_DIRECTORY})
 set(ARDUINO_USB_STRING_FLAGS "-DUSB_MANUFACTURER=\"Arduino LLC\" -DUSB_PRODUCT=\"\\\"Arduino Zero\\\"\"")
 set(ARDUINO_BOARD_FLAGS "-DF_CPU=${ARDUINO_FCPU} -DARDUINO=2491 -DARDUINO_M0PLUS=10605 -DARDUINO_SAMD_ZERO -DARDUINO_ARCH_SAMD -D__SAMD21G18A__ -DUSB_VID=0x2341 -DUSB_PID=0x804d -DUSBCON")
 set(ARDUINO_C_FLAGS "-g -Os -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=${ARDUINO_MCU} -mthumb ${ARDUINO_BOARD_FLAGS}")
-set(ARDUINO_CXX_FLAGS "${ARDUINO_C_FLAGS} -fno-threadsafe-statics  -fno-rtti -fno-exceptions")
+set(ARDUINO_CXX_FLAGS "${ARDUINO_C_FLAGS} -fno-threadsafe-statics -fno-rtti -fno-exceptions")
 set(ARDUINO_ASM_FLAGS "-g -x assembler-with-cpp ${ARDUINO_BOARD_FLAGS}")
 
 include(LibraryFlags)
@@ -128,6 +125,9 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   set(CMAKE_C_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
   set(CMAKE_CXX_COMPILER "${ARM_TOOLS}/arm-none-eabi-g++")
   set(CMAKE_ASM_COMPILER "${ARM_TOOLS}/arm-none-eabi-gcc")
+  set(CMAKE_AR "${ARM_TOOLS}/arm-none-eabi-ar")
+  set(CMAKE_RANLIB "${ARM_TOOLS}/arm-none-eabi-ranlib")
+
 
   if(NOT TARGET core)
     message("-- Configuring Arduino core")
