@@ -197,12 +197,12 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   target_include_directories(${TARGET_NAME} PUBLIC "${LIB_INCLUDES}")
 
   add_custom_command(TARGET ${TARGET_NAME}.elf POST_BUILD
-    COMMAND ${CMAKE_C_COMPILER} -Os -Wl,--gc-sections -save-temps -T${ARDUINO_BOOTLOADER} ${PRINTF_FLAGS} -lm
+    COMMAND ${CMAKE_C_COMPILER} -Os -Wl,--gc-sections -save-temps -T${ARDUINO_BOOTLOADER} ${PRINTF_FLAGS}
     --specs=nano.specs --specs=nosys.specs -mcpu=${ARDUINO_MCU} -mthumb -Wl,--cref -Wl,--check-sections
     -Wl,--gc-sections -Wl,--unresolved-symbols=report-all -Wl,--warn-common -Wl,--warn-section-align
     -Wl,-Map,${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.map -o ${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.elf
     ${LIBRARY_OUTPUT_DIRECTORY}/lib${TARGET_NAME}.a ${LIBRARY_DEPS} ${LIBRARY_OUTPUT_DIRECTORY}/libcore.a
-    -L${ARDUINO_CMSIS_DIRECTORY}/Lib/GCC/ -larm_cortexM0l_math
+    -L${ARDUINO_CMSIS_DIRECTORY}/Lib/GCC/ -larm_cortexM0l_math -lm
   )
 
   add_custom_target(${TARGET_NAME}.bin)
