@@ -38,6 +38,8 @@ set(ARDUINO_C_FLAGS "-g -Os -ffunction-sections -fdata-sections -nostdlib --para
 set(ARDUINO_CXX_FLAGS "${ARDUINO_C_FLAGS} -fno-threadsafe-statics -fno-rtti -fno-exceptions")
 set(ARDUINO_ASM_FLAGS "-g -x assembler-with-cpp ${ARDUINO_BOARD_FLAGS}")
 
+set(ARDUINO_INCLUDE_CORE ON)
+
 include(LibraryFlags)
 include(Samd21)
 
@@ -129,7 +131,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   set(CMAKE_AR "${ARM_TOOLS}/arm-none-eabi-ar")
   set(CMAKE_RANLIB "${ARM_TOOLS}/arm-none-eabi-ranlib")
 
-
+  if(ARDUINO_INCLUDE_CORE)
   if(NOT TARGET core)
     message("-- Configuring Arduino core")
     add_library(core STATIC ${ARDUINO_SOURCE_FILES})
@@ -145,6 +147,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
     read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
     target_include_directories(core PUBLIC "${ARDUINO_INCLUDES}")
   endif()
+  endif()
 
   message("-- Configuring ${TARGET_NAME}")
 
@@ -154,7 +157,11 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   setup_libraries(LIBRARY_INFO "${ARDUINO_BOARD}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS} "${ALL_LIBRARIES}")
 
   # Configure top level binrary target/dependencies.
-  add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIRECTORY}/main.cpp ${TARGET_SOURCE_FILES})
+  if(ARDUINO_INCLUDE_CORE)
+    add_library(${TARGET_NAME} STATIC ${ARDUINO_CORE_DIRECTORY}/main.cpp ${TARGET_SOURCE_FILES})
+  else()
+    add_library(${TARGET_NAME} STATIC ${TARGET_SOURCE_FILES})
+  endif()
   set_target_properties(${TARGET_NAME} PROPERTIES C_STANDARD 11)
   set_target_properties(${TARGET_NAME} PROPERTIES CXX_STANDARD 11)
   set_target_properties(${TARGET_NAME}
@@ -166,7 +173,9 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   apply_compile_flags("${ARDUINO_CORE_DIRECTORY}/main.cpp;${SOURCE_FILES}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS})
 
   add_custom_target(${TARGET_NAME}.elf)
-  add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
+  if(ARDUINO_INCLUDE_CORE)
+    add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
+  endif()
 
   # Pull all library includes and tack them onto the end of our flag vars and
   # also add them as dependencies of the top level target.
@@ -196,13 +205,20 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
 
   target_include_directories(${TARGET_NAME} PUBLIC "${LIB_INCLUDES}")
 
+  if(ARDUINO_INCLUDE_CORE)
+    list(APPEND LIBRARY_DEPS ${LIBRARY_OUTPUT_DIRECTORY}/libcore.a)
+    set(additional_libs -larm_cortexM0l_math -lm ${PRINTF_FLAGS})
+  else()
+    set(additional_libs "")
+  endif()
+
   add_custom_command(TARGET ${TARGET_NAME}.elf POST_BUILD
-    COMMAND ${CMAKE_C_COMPILER} -Os -Wl,--gc-sections -save-temps -T${ARDUINO_BOOTLOADER} ${PRINTF_FLAGS}
+    COMMAND ${CMAKE_C_COMPILER} -Os -Wl,--gc-sections -save-temps -T${ARDUINO_BOOTLOADER}
     --specs=nano.specs --specs=nosys.specs -mcpu=${ARDUINO_MCU} -mthumb -Wl,--cref -Wl,--check-sections
     -Wl,--gc-sections -Wl,--unresolved-symbols=report-all -Wl,--warn-common -Wl,--warn-section-align
     -Wl,-Map,${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.map -o ${LIBRARY_OUTPUT_DIRECTORY}/${TARGET_NAME}.elf
-    ${LIBRARY_OUTPUT_DIRECTORY}/lib${TARGET_NAME}.a ${LIBRARY_DEPS} ${LIBRARY_OUTPUT_DIRECTORY}/libcore.a
-    -L${ARDUINO_CMSIS_DIRECTORY}/Lib/GCC/ -larm_cortexM0l_math -lm
+    ${LIBRARY_OUTPUT_DIRECTORY}/lib${TARGET_NAME}.a ${LIBRARY_DEPS}
+    -L${ARDUINO_CMSIS_DIRECTORY}/Lib/GCC/ ${additional_libs}
   )
 
   add_custom_target(${TARGET_NAME}.bin)
