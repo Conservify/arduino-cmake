@@ -50,7 +50,7 @@ function(read_arduino_libraries VAR_NAME PATH)
   set(libraries)
 
   set(libraries_file ${PATH}/arduino-libraries)
-  message("-- Looking for ${libraries_file}")
+  # message("-- Looking for ${libraries_file}")
   if(EXISTS ${libraries_file})
     execute_process(COMMAND arduino-deps --dir ${GITDEPS_DIRECTORY} --config ${libraries_file})
 
@@ -133,7 +133,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
 
   if(ARDUINO_INCLUDE_CORE)
   if(NOT TARGET core)
-    message("-- Configuring Arduino core")
+    # message("-- Configuring Arduino core")
     add_library(core STATIC ${ARDUINO_SOURCE_FILES})
     set_target_properties(core PROPERTIES C_STANDARD 11)
     set_target_properties(core PROPERTIES CXX_STANDARD 11)
@@ -188,7 +188,7 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
     list(GET "${key}_INFO" 4 LIB_TARGET_NAME)
 
     if(NOT HEADERS_ONLY)
-      message("-- Dependency ${TARGET_NAME} ${LIB_TARGET_NAME}")
+      # message("-- Dependency ${TARGET_NAME} ${LIB_TARGET_NAME}")
       add_dependencies(${TARGET_NAME}.elf ${LIB_TARGET_NAME})
       list(APPEND LIBRARY_DEPS "${LIBRARY_OUTPUT_DIRECTORY}/lib${LIB_TARGET_NAME}.a")
     endif()
@@ -317,7 +317,7 @@ function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARY_C_FLAGS LIBRARY_CXX_FLAG
             RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
         )
 
-        message("-- Configuring library: ${LIB_TARGET_NAME} (${LIB_PATH})")
+        # message("-- Configuring library: ${LIB_TARGET_NAME} (${LIB_PATH})")
 
         apply_compile_flags("${LIB_SRCS}" "${LIBRARY_C_FLAGS}" "${LIBRARY_CXX_FLAGS}" "${LIBRARY_ASM_FLAGS}")
 
@@ -326,10 +326,10 @@ function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARY_C_FLAGS LIBRARY_CXX_FLAG
 
         target_link_libraries(${LIB_TARGET_NAME} ${BOARD_ID}_CORE ${ALL_LIB_TARGETS})
       else()
-        message("-- Configuring headers only library: ${LIB_TARGET_NAME}")
+        # message("-- Configuring headers only library: ${LIB_TARGET_NAME}")
       endif()
     else()
-      message("-- Library already configured: ${LIB_TARGET_NAME}")
+      # message("-- Library already configured: ${LIB_TARGET_NAME}")
 
       list(APPEND ALL_LIB_TARGETS ${LIB_TARGET_NAME})
     endif()
