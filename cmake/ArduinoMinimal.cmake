@@ -40,6 +40,10 @@ set(ARDUINO_ASM_FLAGS "-g -x assembler-with-cpp ${ARDUINO_BOARD_FLAGS}")
 
 set(ARDUINO_INCLUDE_CORE ON)
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake)
+message("INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake")
+include(${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake)
+endif()
 include(LibraryFlags)
 include(Samd21)
 
@@ -132,29 +136,34 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
   set(CMAKE_RANLIB "${ARM_TOOLS}/arm-none-eabi-ranlib")
 
   if(ARDUINO_INCLUDE_CORE)
-  if(NOT TARGET core)
-    # message("-- Configuring Arduino core")
-    add_library(core STATIC ${ARDUINO_SOURCE_FILES})
-    set_target_properties(core PROPERTIES C_STANDARD 11)
-    set_target_properties(core PROPERTIES CXX_STANDARD 11)
-    set_target_properties(core
-        PROPERTIES
-        ARCHIVE_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
-        LIBRARY_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
-        RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
-    )
-    apply_compile_flags("${ARDUINO_SOURCE_FILES}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS})
-    read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
-    target_include_directories(core PUBLIC "${ARDUINO_INCLUDES}")
-  endif()
+    if(NOT TARGET core)
+      # message("-- Configuring Arduino core")
+      add_library(core STATIC ${ARDUINO_SOURCE_FILES})
+      set_target_properties(core PROPERTIES C_STANDARD 11)
+      set_target_properties(core PROPERTIES CXX_STANDARD 11)
+      set_target_properties(core
+          PROPERTIES
+          ARCHIVE_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+          LIBRARY_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+          RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
+      )
+      apply_compile_flags("${ARDUINO_SOURCE_FILES}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS})
+      read_arduino_libraries(GLOBAL_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
+      target_include_directories(core PUBLIC "${ARDUINO_INCLUDES}")
+    endif()
   endif()
 
   message("-- Configuring ${TARGET_NAME}")
 
-  # Read everything about all the libraries we're depending on.
-  read_arduino_libraries(PROJECT_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
-  set(ALL_LIBRARIES "${GLOBAL_LIBRARIES};${PROJECT_LIBRARIES};${LIBRARIES}")
-  setup_libraries(LIBRARY_INFO "${ARDUINO_BOARD}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS} "${ALL_LIBRARIES}")
+  if(EXTERNAL_DEPENDENCIES)
+    set(ALL_LIBRARIES "${GLOBAL_LIBRARIES};${EXTERNAL_DEPENDENCIES};${LIBRARIES}")
+    setup_libraries(LIBRARY_INFO "${ARDUINO_BOARD}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS} "${ALL_LIBRARIES}")
+  else()
+    # Read everything about all the libraries we're depending on.
+    read_arduino_libraries(PROJECT_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR})
+    set(ALL_LIBRARIES "${GLOBAL_LIBRARIES};${PROJECT_LIBRARIES};${LIBRARIES}")
+    setup_libraries(LIBRARY_INFO "${ARDUINO_BOARD}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS} "${ALL_LIBRARIES}")
+  endif()
 
   # Configure top level binrary target/dependencies.
   if(ARDUINO_INCLUDE_CORE)
@@ -169,10 +178,12 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
       ARCHIVE_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
       LIBRARY_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
       RUNTIME_OUTPUT_DIRECTORY "${LIBRARY_OUTPUT_DIRECTORY}"
-  )
+      )
+
   apply_compile_flags("${ARDUINO_CORE_DIRECTORY}/main.cpp;${SOURCE_FILES}" ${ARDUINO_C_FLAGS} ${ARDUINO_CXX_FLAGS} ${ARDUINO_ASM_FLAGS})
 
   add_custom_target(${TARGET_NAME}.elf)
+
   if(ARDUINO_INCLUDE_CORE)
     add_dependencies(${TARGET_NAME}.elf core ${TARGET_NAME})
   endif()
@@ -183,6 +194,9 @@ macro(arduino TARGET_NAME TARGET_SOURCE_FILES LIBRARIES)
 
   foreach(key ${LIBRARY_INFO})
     set(LIB_INCLUDES "${LIB_INCLUDES};${${key}_INCLUDES}")
+
+    # message("INFO ${key} ${${key}_INFO}")
+    # message("INCL ${key} ${${key}_INCLUDES}")
 
     list(GET "${key}_INFO" 3 HEADERS_ONLY)
     list(GET "${key}_INFO" 4 LIB_TARGET_NAME)
@@ -277,7 +291,17 @@ function(setup_libraries VAR_NAME ARDUINO_BOARD LIBRARY_C_FLAGS LIBRARY_CXX_FLAG
     string(REGEX REPLACE "/" "_" LIB_SHORT_NAME ${LIB_SHORT_NAME})
     string(REGEX REPLACE "^_" "" LIB_SHORT_NAME ${LIB_SHORT_NAME})
 
-    library_find_path(LIB_PATH ${LIB_NAME_OR_RELATIVE_PATH} ${LIB_SHORT_NAME})
+    set(provided_path "${${LIB_SHORT_NAME}_PATH}")
+
+    if(EXISTS ${provided_path})
+      if(EXISTS ${provided_path}/src)
+        set(LIB_PATH ${provided_path}/src)
+      else()
+        set(LIB_PATH ${provided_path})
+      endif()
+    else()
+      library_find_path(LIB_PATH ${LIB_NAME_OR_RELATIVE_PATH} ${LIB_SHORT_NAME})
+    endif()
 
     if(NOT LIB_PATH)
       foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libraries)
