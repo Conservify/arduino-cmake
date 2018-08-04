@@ -1,7 +1,12 @@
+properties([
+    [$class: 'BuildDiscarderProperty', strategy: [$class: 'LogRotator', numToKeepStr: '5']],
+    pipelineTriggers([[$class: 'GitHubPushTrigger']]),
+])
+
 timestamps {
     node () {
         stage ('git') {
-            checkout([$class: 'GitSCM', branches: [[name: '*/master']], userRemoteConfigs: [[url: 'https://github.com/Conservify/arduino-cmake-minimal.git']]])
+            checkout scm
         }
     }
 }
